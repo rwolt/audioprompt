@@ -1,0 +1,9 @@
+[theme]
+# Coral-ish primary color; Streamlit uses this for primary buttons
+primaryColor = "#FF6B6B"
+base = "dark"
+
+# Leave other colors to defaults to avoid clutter; adjust later if needed
+# backgroundColor = ""
+# secondaryBackgroundColor = ""
+# textColor = ""
