@@ -112,6 +112,41 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 
 ---
 
-## 📜 License
-MIT (or your preferred license)
+## 🧬 How It Works (quick refresher)
+- Pink noise base: builds 1/√f spectrum in the frequency domain and inverse‑FFTs to time domain; normalizes to headroom.
+- Random melody (optional):
+  - Picks scale notes (root + mode) within a MIDI range; durations from BPM‑scaled choices.
+  - Step/leap behavior, rests, and seed‑driven randomness; converts notes to an f0 trajectory.
+  - Expression: optional glides between notes and subtle vibrato; light smoothing to reduce discontinuities.
+- Spectral imprint:
+  - STFT on the pink noise; per frame, builds a harmonic mask centered at the current f0 (and harmonics) with Gaussian bandwidth proportional to frequency.
+  - Multiplies the STFT magnitude by this mask to emphasize harmonic structure; preserves phase; ISTFT back to time domain; re‑normalize.
+- Focus band (optional): applies a global soft band‑pass mask in log‑frequency (preset or custom low/high Hz), with outside‑band floor.
+- Rhythmic gate (optional): constructs an amplitude envelope from event onsets/offsets (attack/release), and applies it to the prompt.
+- Prepend path: resamples the prompt if needed, trims to “prompt seconds”, applies gain and fades, concatenates with the input, and trims peaks (≤ −1 dBFS).
+- Tagged filenames: include `scale`, `focus` (preset or band), and `seed_used` for easy A/B comparisons.
+- Determinism: fixed `seed` yields repeatable results; `-1` chooses a new random seed at each generation (Streamlit app).
 
+---
+
+## ⚖️ Licensing Notes (MIT vs GPL?)
+- MIT is permissive: you (and others) can use the code in closed‑source and commercial apps with attribution. This aligns well if you might build a commercial app later.
+- GPL (and AGPL) are copyleft: if you distribute a derived app, you must open‑source it under the same license (AGPL extends to network use). This deters closed‑source reuse but also constrains your own future commercial, closed distribution.
+- Middle ground: dual‑license (e.g., MIT for open use + a separate commercial license), or keep advanced features proprietary in a separate, non‑open repo.
+- Recommendation for this repo: MIT (you can still build proprietary successors); see `LICENSE`.
+
+---
+
+## 🛡️ Legal & Content Use
+- You are responsible for the audio you upload. Only use content you own or are licensed to process.
+- Streamlit app behavior (suggested best practice):
+  - Process files in memory and do not retain them on the server.
+  - Display an on‑screen notice: “Upload only content you have rights to. Files are processed ephemerally and not stored.”
+  - Add a brief Terms/Privacy note to the README and app footer if you host it publicly.
+- If you receive takedown requests (e.g., DMCA), remove infringing content promptly. Consider a simple contact email in the README/app footer.
+- This repository provides code only and no legal advice; consult an attorney if you need specific guidance for a hosted service.
+
+---
+
+## 📜 License
+MIT License — see `LICENSE`.
