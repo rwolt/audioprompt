@@ -9,7 +9,7 @@ Create short, steerable “audio prompts” to nudge AI music tools. AudioPrompt
 - 🎚️ Spectral focus (vocal/guitar/bass presets or custom Hz band)
 - 🥁 Rhythmic gate from note events (phrase‑like envelope)
 - 📎 Drag‑and‑drop input; tagged downloads (scale/focus/seed)
-- 🧰 Pure Python DSP (NumPy/SciPy/soundfile) — no ffmpeg
+- 🧰 Pure Python DSP (NumPy/SciPy/soundfile)
 
 ---
 
