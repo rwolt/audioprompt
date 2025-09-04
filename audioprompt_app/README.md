@@ -95,4 +95,4 @@ Code structure
   - prompt.py: pink noise, melody imprint with optional focus, rhythmic gate.
 
 License
-- Choose and add a license for public use if desired.
+- MIT — see `../../LICENSE`. This app is part of the AudioPrompt repository and is covered by the root license.
