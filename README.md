@@ -32,6 +32,13 @@ source .venv/bin/activate    # Windows: .venv\Scripts\activate
 python -m pip install -r requirements.txt
 ```
 
+Conda alternative
+```bash
+conda create -n audioprompt python=3.11 -y
+conda activate audioprompt
+python -m pip install -r requirements.txt
+```
+
 ---
 
 ## 🚀 Streamlit App (recommended)
@@ -40,6 +47,15 @@ Run locally
 ```bash
 cd audioprompt_app
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Conda alternative
+```bash
+cd audioprompt_app
+conda create -n audioprompt-app python=3.11 -y
+conda activate audioprompt-app
 pip install -r requirements.txt
 streamlit run app.py
 ```
@@ -138,13 +154,16 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 ---
 
 ## 🛡️ Legal & Content Use
-- You are responsible for the audio you upload. Only use content you own or are licensed to process.
-- Streamlit app behavior (suggested best practice):
-  - Process files in memory and do not retain them on the server.
-  - Display an on‑screen notice: “Upload only content you have rights to. Files are processed ephemerally and not stored.”
-  - Add a brief Terms/Privacy note to the README and app footer if you host it publicly.
-- If you receive takedown requests (e.g., DMCA), remove infringing content promptly. Consider a simple contact email in the README/app footer.
-- This repository provides code only and no legal advice; consult an attorney if you need specific guidance for a hosted service.
+- Upload only content you have the rights and permissions to use.
+- By using the app, you confirm you have permission to process any uploaded audio.
+- This project is provided “as is” without warranties; see the MIT license for details.
+
+---
+
+## 📄 Terms & Privacy (brief)
+- You retain all rights to your audio. You grant permission to process your uploaded file(s) for the purpose of generating prompts.
+- Do not upload third‑party copyrighted material without authorization.
+- No personal data is collected beyond what Streamlit requires to serve the app.
 
 ---
 

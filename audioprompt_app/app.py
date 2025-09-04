@@ -373,3 +373,9 @@ with right:
             st.info("Upload a WAV/FLAC/OGG file to create a combined output.")
     else:
         st.info("No input file uploaded; only the prompt is generated.")
+
+# Footer: brief Terms & Privacy notice (public hosting)
+st.markdown("---")
+st.caption(
+    "Terms & Privacy: Upload only content you have rights to. By using this app you confirm you have permission to process any uploaded audio."
+)
