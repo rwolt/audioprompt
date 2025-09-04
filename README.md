@@ -145,14 +145,6 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 
 ---
 
-## ⚖️ Licensing Notes (MIT vs GPL?)
-- MIT is permissive: you (and others) can use the code in closed‑source and commercial apps with attribution. This aligns well if you might build a commercial app later.
-- GPL (and AGPL) are copyleft: if you distribute a derived app, you must open‑source it under the same license (AGPL extends to network use). This deters closed‑source reuse but also constrains your own future commercial, closed distribution.
-- Middle ground: dual‑license (e.g., MIT for open use + a separate commercial license), or keep advanced features proprietary in a separate, non‑open repo.
-- Recommendation for this repo: MIT (you can still build proprietary successors); see `LICENSE`.
-
----
-
 ## 🛡️ Legal & Content Use
 - Upload only content you have the rights and permissions to use.
 - By using the app, you confirm you have permission to process any uploaded audio.
