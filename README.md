@@ -128,7 +128,7 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 
 ---
 
-## 🧬 How It Works (quick refresher)
+## 🧬 How It Works
 - Pink noise base: builds 1/√f spectrum in the frequency domain and inverse‑FFTs to time domain; normalizes to headroom.
 - Random melody (optional):
   - Picks scale notes (root + mode) within a MIDI range; durations from BPM‑scaled choices.
@@ -152,7 +152,7 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 
 ---
 
-## 📄 Terms & Privacy (brief)
+## 📄 Terms & Privacy
 - You retain all rights to your audio. You grant permission to process your uploaded file(s) for the purpose of generating prompts.
 - Do not upload third‑party copyrighted material without authorization.
 - No personal data is collected beyond what Streamlit requires to serve the app.
