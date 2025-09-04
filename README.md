@@ -1,62 +1,117 @@
 # AudioPrompt — Streamlit App, Notebook, and CLI
 
-AudioPrompt helps you create short “guidance” audio clips to bias AI music tools that accept an audio prompt or seed. It uses pure Python (NumPy/SciPy/soundfile) and ships in three forms:
-- Streamlit app (local or Streamlit Community Cloud)
-- Jupyter notebook (`audioprompt_workbook.ipynb`)
-- Minimal CLI commands
+Create short, steerable “audio prompts” to nudge AI music tools. AudioPrompt can imprint a scale‑constrained melody onto pink noise, emphasize vocal/guitar/bass bands, and prepend the prompt to your track for upload.
+
+---
+
+## ✨ Features
+- 🧠 Scale‑driven melody imprint (randomized, in‑key, with vibrato/glides)
+- 🎚️ Spectral focus (vocal/guitar/bass presets or custom Hz band)
+- 🥁 Rhythmic gate from note events (phrase‑like envelope)
+- 📎 Drag‑and‑drop input; tagged downloads (scale/focus/seed)
+- 🧰 Pure Python DSP (NumPy/SciPy/soundfile) — no ffmpeg
+
+---
+
+## 📦 What’s Included
+- Streamlit App (local or Streamlit Community Cloud)
+- Jupyter Notebook (`audioprompt_workbook.ipynb`)
+- Minimal CLI for analysis/prompt/prepend
 
 Supported formats
 - Input: WAV/FLAC/OGG/AIFF via libsndfile
 - Output: WAV
 
-Install
+Requirements
 - Python 3.9+
-- Create/activate a virtual environment (recommended), then:
-  - python -m pip install -r requirements.txt
+- Install deps in a virtual environment (recommended):
 
-Ways to use AudioPrompt
+```bash
+python -m venv .venv
+source .venv/bin/activate    # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
+```
 
-1) Streamlit app (recommended)
-- Run locally:
-  - cd audioprompt_app
-  - python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
-  - pip install -r requirements.txt
-  - streamlit run app.py
-- Deploy to Streamlit Community Cloud:
-  - Push this repo to GitHub
-  - Create an app on Streamlit Community Cloud and point it to `audioprompt_app/app.py`
-  - It installs requirements and serves your app automatically
+---
 
-What the app does
-- Generates a pink‑noise prompt, optionally imprinted with a randomized, scale‑constrained melody
-- Optional spectral focus (vocal/guitar/bass/custom Hz band) and rhythmic gate
-- Drag‑and‑drop input (optional) and prepends the prompt to create a combined output
-- Downloads: prompt‑only and combined WAVs with tagged filenames (scale/focus/seed)
+## 🚀 Streamlit App (recommended)
 
-2) Notebook (`audioprompt_workbook.ipynb`)
-- Open audioprompt_workbook.ipynb and run top to bottom
-- Flip the toggles to switch between straight pink noise, focused bands, and scale‑driven melodies
-- Set INPUT_AUDIO to your track to prepend and export; or generate prompt‑only clips
-- The workbook mirrors the Streamlit app behavior and includes the same features
+Run locally
+```bash
+cd audioprompt_app
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-3) CLI (basic)
-- Analyze to a long‑term profile (optional):
-  - python audioprompt.py analyze input.wav --bands 1024 --bins 24 --outdir .
-- Generate a shaped pink‑noise prompt from an input track:
-  - python audioprompt.py prompt input.wav prompt.wav --duration 6 --max-gain 6
-- Prepend an existing prompt to a seed track:
-  - python audioprompt.py prepend prompt.wav input.wav upload.wav
+Deploy to Streamlit Community Cloud
+```text
+1) Push this repo to GitHub
+2) Create a new Streamlit app and point it to audioprompt_app/app.py
+3) It installs audioprompt_app/requirements.txt and runs automatically
+```
+
+Quick start (in the app)
+- Set Prompt seconds and Melody (root/scale/BPM/range)
+- (Optional) Enable Focus (vocal/guitar/bass/custom Hz band)
+- Press “Generate Prompt” → preview Prompt and Combined → download
 
 Tips
-- Prompt length: 3–6 seconds is usually enough to “prime” generation
-- Use WAV/FLAC inputs for maximum reliability
-- If the prompt masks the start of the track, reduce prompt gain or shorten the length
+- 3–6 s prompts give a clear steer without masking
+- Use WAV/FLAC inputs for reliability
 
-Project layout
-- audioprompt_app/ — Streamlit app (two‑column UI, dark theme, drag‑drop upload)
-- audioprompt_app/src/audioprompt_core/ — shared core (audio, melody, prompt)
-- audioprompt_workbook.ipynb — shareable workbook version of the workflow
-- audioprompt.py — CLI (analyze/prompt/prepend)
+---
 
-License
+## 📓 Notebook (`audioprompt_workbook.ipynb`)
+- Open the workbook and run cells top‑to‑bottom.
+- Set `INPUT_AUDIO`, `PROMPT_SECONDS`, and toggles (Melody, Focus, Gate).
+- Preview `y_prompt`; optionally prepend and export tagged WAVs.
+
+---
+
+## 🧪 CLI (headless)
+
+Usage
+```text
+python audioprompt.py analyze <in.wav> [--bands N] [--bins M] [--outdir DIR] [--print-eq]
+python audioprompt.py prompt  <in.wav> <out.wav> [--duration S] [--max-gain dB]
+python audioprompt.py prepend <prompt.wav> <seed.wav> <out.wav>
+
+Options
+  analyze:
+    --bands N      Number of log-spaced bands for the profile (default: 1024)
+    --bins M       Downsampled bands for convenience/preview (default: 24)
+    --outdir DIR   Directory for profile outputs (default: .)
+    --print-eq     Print firequalizer-style entries to stdout
+
+  prompt:
+    --duration S   Prompt length in seconds (default: 6.0)
+    --max-gain dB  Max inverse-EQ boost (default: 6.0 dB)
+```
+
+Examples
+```bash
+# Analyze and print firequalizer entries
+python audioprompt.py analyze input.wav --print-eq
+
+# Generate an 8 s prompt with stronger shaping
+python audioprompt.py prompt input.wav prompt.wav --duration 8 --max-gain 8
+
+# Prepend prompt to seed for upload
+python audioprompt.py prepend prompt.wav input.wav upload.wav
+```
+
+---
+
+## 📁 Project Layout
+- `audioprompt_app/` — Streamlit app (two‑column UI, dark theme, drag‑drop upload)
+- `audioprompt_app/src/audioprompt_core/` — shared core (audio, melody, prompt)
+- `audioprompt_workbook.ipynb` — shareable workbook version of the workflow
+- `audioprompt.py` — CLI (analyze/prompt/prepend)
+- `requirements.txt` — minimal dependencies for the CLI/analysis tools
+
+---
+
+## 📜 License
 MIT (or your preferred license)
+
