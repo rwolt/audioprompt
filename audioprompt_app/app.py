@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import streamlit as st
 from scipy.signal import resample_poly
+import matplotlib.pyplot as plt
 
 # Import core from ./src
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
@@ -261,7 +262,7 @@ with right:
     )
 
     # Advanced controls (auto‑expand for custom preset)
-    with st.expander("Focus – Advanced", expanded=(enable_focus and focus_preset == "custom")):
+    with st.expander("Focus Band – Advanced Settings", expanded=(enable_focus and focus_preset == "custom")):
         if enable_focus and focus_preset == "custom":
             band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
         else:
@@ -396,6 +397,21 @@ with right:
     # Prompt preview and download
     st.markdown("**Prompt**")
     sr_prompt = int(st.session_state.get("prompt_sr", int(sr)))
+    # Spectrogram preview (Prompt)
+    try:
+        from scipy.signal import spectrogram as _spectrogram
+        fig_p, ax_p = plt.subplots(figsize=(6, 2.4))
+        f_p, t_p, Sxx_p = _spectrogram(y_prompt.astype(np.float32, copy=False), sr_prompt, nperseg=1024, noverlap=768)
+        Sxx_p_db = 10 * np.log10(Sxx_p + 1e-12)
+        pcm = ax_p.pcolormesh(t_p, f_p, Sxx_p_db, shading="auto", cmap="magma")
+        ax_p.set_ylabel("Hz")
+        ax_p.set_xlabel("s")
+        ax_p.set_title("Prompt – Spectrogram")
+        plt.colorbar(pcm, ax=ax_p, fraction=0.046, pad=0.02, label="dB")
+        st.pyplot(fig_p, use_container_width=True)
+        plt.close(fig_p)
+    except Exception:
+        pass
     prompt_wav = wav_bytes(y_prompt, sr_prompt)
     st.audio(prompt_wav, format="audio/wav")
 
@@ -442,6 +458,21 @@ with right:
             peak = float(np.max(np.abs(combined)) + 1e-12)
             if peak > 0.999:
                 combined = (combined / peak * 0.999).astype(np.float32)
+
+            # Spectrogram preview (Combined)
+            try:
+                fig_c, ax_c = plt.subplots(figsize=(6, 2.4))
+                f_c, t_c, Sxx_c = _spectrogram(combined.astype(np.float32, copy=False), int(sr), nperseg=1024, noverlap=768)
+                Sxx_c_db = 10 * np.log10(Sxx_c + 1e-12)
+                pcm2 = ax_c.pcolormesh(t_c, f_c, Sxx_c_db, shading="auto", cmap="magma")
+                ax_c.set_ylabel("Hz")
+                ax_c.set_xlabel("s")
+                ax_c.set_title("Combined – Spectrogram")
+                plt.colorbar(pcm2, ax=ax_c, fraction=0.046, pad=0.02, label="dB")
+                st.pyplot(fig_c, use_container_width=True)
+                plt.close(fig_c)
+            except Exception:
+                pass
 
             combined_wav = wav_bytes(combined, int(sr))
             st.markdown("**Combined**")
