@@ -185,13 +185,12 @@ with top_right:
         enable_gate = st.checkbox("Enable rhythmic gate", value=True, help="Apply a note‑shaped amplitude envelope for phrasing.")
     # Prompt seconds moved to Output & Seed section for better workflow alignment
 
-# Main content columns (add gentle spacing between top row and main content)
-st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+# Single divider spanning both columns to separate top row from main content
+st.divider()
 left, right = st.columns(2)
 
 with left:
 
-    st.divider()
     st.subheader("Melody (when enabled)")
     roots = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
     melody_root = st.selectbox("Root", roots, index=roots.index("E"), help="Root note for the scale (C4=60).")
