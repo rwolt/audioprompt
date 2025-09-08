@@ -332,9 +332,9 @@ with left:
         help="Emphasize energy in a vocal/guitar/bass band or a custom Hz range.",
     )
     tame_low_end = st.checkbox(
-        "Tame Low End",
+        "Rumble Ward",
         value=True,
-        help="Reduce inaudible sub‑bass to free headroom and keep starts clean. Advanced controls in the expander.",
+        help="Reduce sub‑bass rumble and tighten lows (HPF + mono‑lows under the hood).",
     )
     if enable_focus:
         focus_preset = st.radio(
@@ -363,49 +363,31 @@ with left:
             floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
         with colf5:
             sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Steepness of the band edges.")
-        st.markdown("**Low‑End (advanced)**")
-        hpf_cutoff_hz = st.slider(
-            "HPF cutoff (Hz)", 20, 40, 25, 1,
-            help="Frequencies below this are rolled off with a linear‑phase FIR filter.",
-        )
-        steepness = st.select_slider(
-            "Steepness",
-            options=["Normal", "Steep"],
-            value="Steep",
-            help="Filter length: Normal (~512 taps) or Steep (~2048 taps). Steeper = cleaner cutoff (more CPU).",
-        )
-        mono_lows = st.checkbox(
-            "Mono low frequencies",
-            value=True,
-            help="Sum bass to mono (e.g., <120 Hz) to keep low end tight. Mostly relevant for stereo prompts.",
-        )
-        mono_cutoff_hz = st.slider(
-            "Mono below (Hz)", 80, 180, 120, 5,
-            help="Frequencies below this are summed to mono while highs remain unchanged.",
-        )
+        # Low‑end advanced controls hidden for now; using sensible defaults
 
     # Build Focus/imprint/low‑end configs for generation
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
     imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
-    hpf_taps = 2049 if locals().get('steepness', 'Steep') == "Steep" else 513
+    # Defaults while advanced controls are hidden
+    hpf_taps = 2049  # Steep by default
     lowend_cfg = dict(
         tame_low_end=bool(tame_low_end),
-        hpf_cutoff_hz=int(locals().get('hpf_cutoff_hz', 25)),
+        hpf_cutoff_hz=25,
         hpf_taps=int(hpf_taps),
-        mono_lows=bool(locals().get('mono_lows', True)),
-        mono_cutoff_hz=int(locals().get('mono_cutoff_hz', 120)),
+        mono_lows=True,
+        mono_cutoff_hz=120,
     )
 
     # Build Focus/imprint/low‑end configs for generation
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
     imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
-    hpf_taps = 2049 if locals().get('steepness', 'Steep') == "Steep" else 513
+    hpf_taps = 2049  # Steep by default
     lowend_cfg = dict(
         tame_low_end=bool(tame_low_end),
-        hpf_cutoff_hz=int(locals().get('hpf_cutoff_hz', 25)),
+        hpf_cutoff_hz=25,
         hpf_taps=int(hpf_taps),
-        mono_lows=bool(locals().get('mono_lows', True)),
-        mono_cutoff_hz=int(locals().get('mono_cutoff_hz', 120)),
+        mono_lows=True,
+        mono_cutoff_hz=120,
     )
 
 with right:
@@ -434,13 +416,13 @@ with right:
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
     imprint_params = dict(gain=imprint_gain, harmonics=harmonics, bw_frac=bw_frac, floor_db=floor_db, sharpness=sharpness, n_fft=2048)
     # Low-end config dict for core processing
-    hpf_taps = 2049 if steepness == "Steep" else 513
+    hpf_taps = 2049  # Steep by default
     lowend_cfg = dict(
         tame_low_end=bool(tame_low_end),
-        hpf_cutoff_hz=int(hpf_cutoff_hz),
+        hpf_cutoff_hz=25,
         hpf_taps=int(hpf_taps),
-        mono_lows=bool(mono_lows),
-        mono_cutoff_hz=int(mono_cutoff_hz),
+        mono_lows=True,
+        mono_cutoff_hz=120,
     )
 
     # Render Generate & Outputs at the top of the right column
