@@ -197,12 +197,14 @@ with top_left:
     st.subheader("Quick Start")
     st.markdown(
         """
-        1. Drag‑drop an audio file (optional).
-        2. Set Prompt seconds and choose Melody settings (scale, range, BPM).
-        3. (Optional) Enable Focus to emphasize a vocal/guitar/bass band or custom Hz range.
-        4. Press Generate Prompt, then preview and download the Prompt and Combined outputs.
-        
-        Tips: 3–6 s prompts give a clear steer without masking; try Minor Blues + Vocal focus for vocal‑friendly nudges.
+        AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It can imprint a scale‑based melody, emphasize a frequency band (vocal/guitar/bass/custom), and prepend the prompt to your input audio.
+
+        1. Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only.
+        2. Set Prompt seconds and choose Melody settings (root/scale/BPM). Default is E minor pentatonic.
+        3. Use Focus (or Custom band) and enable Tame Low End for cleaner results.
+        4. Click Generate Prompt. Preview the Prompt, and if input audio is provided, the Combined result. Download the tagged WAVs.
+
+        Tips: 3–6 s prompts give a clear steer without masking; “Vocal” focus often helps melody “speak”.
         """
     )
 with top_right:

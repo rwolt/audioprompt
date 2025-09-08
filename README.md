@@ -67,9 +67,10 @@ Deploy to Streamlit Community Cloud
 ```
 
 Quick start (in the app)
+- Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only
 - Set Prompt seconds and Melody (root/scale/BPM/range)
-- (Optional) Enable Focus (vocal/guitar/bass/custom Hz band)
-- Press “Generate Prompt” → preview Prompt and Combined → download
+- Use Focus (vocal/guitar/bass/custom Hz band) and enable Tame Low End if needed
+- Press “Generate Prompt” → preview Prompt and (if provided) Combined → download tagged WAVs
 
 Tips
 - 3–6 s prompts give a clear steer without masking
