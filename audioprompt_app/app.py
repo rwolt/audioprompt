@@ -145,9 +145,9 @@ def build_prompt(
 
 
 st.title("AudioPrompt")
-st.subheader("Quick Start")
 top_left, top_right = st.columns([1, 1])
 with top_left:
+    st.subheader("Quick Start")
     st.markdown(
         """
         1. Drag‑drop an audio file (optional).
