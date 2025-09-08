@@ -322,6 +322,8 @@ with left:
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
 
+    # Small vertical gap between Melody and Focus sections
+    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
     # Focus (left) — for future tabs, keep flat containers
     st.subheader("Focus")
     enable_focus = st.checkbox(
