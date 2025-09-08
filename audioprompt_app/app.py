@@ -346,7 +346,7 @@ with left:
         )
     else:
         focus_preset = "none"
-    with st.expander("Focus Band – Advanced Settings", expanded=(enable_focus and focus_preset == "custom")):
+    with st.expander("Focus Band – Advanced", expanded=(enable_focus and focus_preset == "custom")):
         if enable_focus and focus_preset == "custom":
             band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
         else:
