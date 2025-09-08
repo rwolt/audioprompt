@@ -7,6 +7,12 @@ import streamlit as st
 from scipy.signal import resample_poly
 import matplotlib.pyplot as plt
 
+
+def _rms_dbfs(y: np.ndarray) -> float:
+    y = y.astype(np.float32, copy=False)
+    rms = float(np.sqrt(np.mean(y * y)) + 1e-12)
+    return 20.0 * np.log10(rms)
+
 # Import core from ./src
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 from audioprompt_core import (
@@ -314,9 +320,32 @@ with right:
         0.5,
         help="Length of the generated prompt (also used when prepending).",
     )
+    # Prompt level group
+    st.markdown("**Prompt Level**")
+    ag_col1, ag_col2 = st.columns([1,1])
+    with ag_col1:
+        auto_gain = st.checkbox(
+            "Auto gain (match seed)",
+            value=False,
+            help="Detect seed loudness and set the prompt level automatically. Uses RMS in dBFS."
+        )
+    with ag_col2:
+        auto_gain_offset_db = st.slider(
+            "Prompt relative to seed (dB)",
+            -12.0, 6.0, -3.0, 0.5,
+            help="Target prompt loudness relative to seed RMS (e.g., −3 dB means the prompt is slightly quieter).",
+            disabled=not auto_gain,
+        )
+
+    # Manual gain (disabled when auto-gain is on)
     colo1, colo2, colo3 = st.columns(3)
     with colo1:
-        prompt_gain_db = st.slider("Prompt gain (dB)", -24.0, 6.0, -3.0, 0.5, help="Level for the prepended prompt.")
+        prompt_gain_db = st.slider(
+            "Prompt gain (dB)",
+            -24.0, 6.0, -3.0, 0.5,
+            help="Level for the prepended prompt.",
+            disabled=auto_gain,
+        )
     with colo2:
         fade_in_ms = st.slider("Fade-in (ms)", 0, 200, 10, 1, help="Smooth ramp at the start.")
     with colo3:
@@ -452,7 +481,18 @@ with right:
                 g = np.gcd(sr_prompt, int(sr))
                 prompt = resample_poly(prompt, int(sr) // g, sr_prompt // g).astype(np.float32)
             prompt = prompt[:target_len]
-            gain = 10 ** (float(prompt_gain_db) / 20.0)
+            # Determine prompt gain: auto or manual
+            if auto_gain:
+                try:
+                    seed_rms_db = _rms_dbfs(x)
+                    prompt_rms_db = _rms_dbfs(prompt[:target_len]) if target_len > 0 else _rms_dbfs(prompt)
+                    desired_db = seed_rms_db + float(auto_gain_offset_db)
+                    gain_db = desired_db - prompt_rms_db
+                except Exception:
+                    gain_db = float(prompt_gain_db)
+            else:
+                gain_db = float(prompt_gain_db)
+            gain = 10 ** (gain_db / 20.0)
             prompt = apply_fades(prompt * gain, int(sr), int(fade_in_ms), int(fade_out_ms))
             combined = np.concatenate([prompt.astype(np.float32, copy=False), x.astype(np.float32, copy=False)], axis=0)
             peak = float(np.max(np.abs(combined)) + 1e-12)
