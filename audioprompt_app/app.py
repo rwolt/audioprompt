@@ -447,86 +447,86 @@ with right:
         prompt_wav = wav_bytes(y_prompt, sr_prompt)
         st.audio(prompt_wav, format="audio/wav")
 
-    # Tagged filenames
-    if uploaded is not None:
-        base_stem = Path(uploaded.name).stem
-    else:
-        base_stem = "prompt"
-    seed_val = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
-    suffix = tag_suffix(enable_melody, melody_scale, enable_focus, focus_params.get("preset"), band if focus_params.get("preset") is None else None, seed_val, output_suffix)
-    prompt_only_name = f"{base_stem}_prompt_scale-{melody_scale if enable_melody else 'none'}_focus-"
-    if enable_focus:
-        if focus_params.get("preset"):
-            prompt_only_name += f"{focus_params['preset']}"
-        elif band:
-            prompt_only_name += f"band-{int(band[0])}-{int(band[1])}"
+        # Tagged filenames
+        if uploaded is not None:
+            base_stem = Path(uploaded.name).stem
         else:
-            prompt_only_name += "custom"
-    else:
-        prompt_only_name += "none"
-    prompt_only_name += f"_seed-{seed_val}.wav"
-
-    st.download_button("Download prompt", data=prompt_wav, file_name=prompt_only_name, mime="audio/wav")
-
-    # Combined output if file provided
-    if uploaded is not None:
-        try:
-            x, sr_in = load_audio_mono(uploaded, int(sr))
-        except Exception as e:
-            st.error(f"Failed to read input audio. Prefer WAV/FLAC/OGG. Error: {e}")
-            x = None
-        if x is not None:
-            # Prepare prepend prompt slice with gain & fades
-            target_len = int(round(float(prompt_seconds) * int(sr)))
-            prompt = y_prompt
-            # Resample prompt if its SR differs
-            if sr_prompt != int(sr):
-                g = np.gcd(sr_prompt, int(sr))
-                prompt = resample_poly(prompt, int(sr) // g, sr_prompt // g).astype(np.float32)
-            prompt = prompt[:target_len]
-            # Determine prompt gain: auto or manual
-            if auto_gain:
-                try:
-                    seed_rms_db = _rms_dbfs(x)
-                    prompt_rms_db = _rms_dbfs(prompt[:target_len]) if target_len > 0 else _rms_dbfs(prompt)
-                    desired_db = seed_rms_db + float(auto_gain_offset_db)
-                    gain_db = desired_db - prompt_rms_db
-                except Exception:
-                    gain_db = float(prompt_gain_db)
+            base_stem = "prompt"
+        seed_val = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
+        suffix = tag_suffix(enable_melody, melody_scale, enable_focus, focus_params.get("preset"), band if focus_params.get("preset") is None else None, seed_val, output_suffix)
+        prompt_only_name = f"{base_stem}_prompt_scale-{melody_scale if enable_melody else 'none'}_focus-"
+        if enable_focus:
+            if focus_params.get("preset"):
+                prompt_only_name += f"{focus_params['preset']}"
+            elif band:
+                prompt_only_name += f"band-{int(band[0])}-{int(band[1])}"
             else:
-                gain_db = float(prompt_gain_db)
-            gain = 10 ** (gain_db / 20.0)
-            prompt = apply_fades(prompt * gain, int(sr), int(fade_in_ms), int(fade_out_ms))
-            combined = np.concatenate([prompt.astype(np.float32, copy=False), x.astype(np.float32, copy=False)], axis=0)
-            peak = float(np.max(np.abs(combined)) + 1e-12)
-            if peak > 0.999:
-                combined = (combined / peak * 0.999).astype(np.float32)
-
-            # Spectrogram preview (Combined)
-            try:
-                fig_c, ax_c = plt.subplots(figsize=(6, 2.4))
-                f_c, t_c, Sxx_c = _spectrogram(combined.astype(np.float32, copy=False), int(sr), nperseg=1024, noverlap=768)
-                Sxx_c_db = 10 * np.log10(Sxx_c + 1e-12)
-                pcm2 = ax_c.pcolormesh(t_c, f_c, Sxx_c_db, shading="auto", cmap="magma")
-                ax_c.set_ylabel("Hz")
-                ax_c.set_xlabel("s")
-                ax_c.set_title("Combined – Spectrogram")
-                plt.colorbar(pcm2, ax=ax_c, fraction=0.046, pad=0.02, label="dB")
-                st.pyplot(fig_c, use_container_width=True)
-                plt.close(fig_c)
-            except Exception:
-                pass
-
-            combined_wav = wav_bytes(combined, int(sr))
-            st.markdown("**Combined**")
-            st.audio(combined_wav, format="audio/wav")
-
-            combined_name = f"{Path(uploaded.name).stem}{suffix}.wav"
-            st.download_button("Download combined", data=combined_wav, file_name=combined_name, mime="audio/wav")
+                prompt_only_name += "custom"
         else:
-            st.info("Upload a WAV/FLAC/OGG file to create a combined output.")
-    else:
-        st.info("No input file uploaded; only the prompt is generated.")
+            prompt_only_name += "none"
+        prompt_only_name += f"_seed-{seed_val}.wav"
+
+        st.download_button("Download prompt", data=prompt_wav, file_name=prompt_only_name, mime="audio/wav")
+
+        # Combined output if file provided
+        if uploaded is not None:
+            try:
+                x, sr_in = load_audio_mono(uploaded, int(sr))
+            except Exception as e:
+                st.error(f"Failed to read input audio. Prefer WAV/FLAC/OGG. Error: {e}")
+                x = None
+            if x is not None:
+                # Prepare prepend prompt slice with gain & fades
+                target_len = int(round(float(prompt_seconds) * int(sr)))
+                prompt = y_prompt
+                # Resample prompt if its SR differs
+                if sr_prompt != int(sr):
+                    g = np.gcd(sr_prompt, int(sr))
+                    prompt = resample_poly(prompt, int(sr) // g, sr_prompt // g).astype(np.float32)
+                prompt = prompt[:target_len]
+                # Determine prompt gain: auto or manual
+                if auto_gain:
+                    try:
+                        seed_rms_db = _rms_dbfs(x)
+                        prompt_rms_db = _rms_dbfs(prompt[:target_len]) if target_len > 0 else _rms_dbfs(prompt)
+                        desired_db = seed_rms_db + float(auto_gain_offset_db)
+                        gain_db = desired_db - prompt_rms_db
+                    except Exception:
+                        gain_db = float(prompt_gain_db)
+                else:
+                    gain_db = float(prompt_gain_db)
+                gain = 10 ** (gain_db / 20.0)
+                prompt = apply_fades(prompt * gain, int(sr), int(fade_in_ms), int(fade_out_ms))
+                combined = np.concatenate([prompt.astype(np.float32, copy=False), x.astype(np.float32, copy=False)], axis=0)
+                peak = float(np.max(np.abs(combined)) + 1e-12)
+                if peak > 0.999:
+                    combined = (combined / peak * 0.999).astype(np.float32)
+
+                # Spectrogram preview (Combined)
+                try:
+                    fig_c, ax_c = plt.subplots(figsize=(6, 2.4))
+                    f_c, t_c, Sxx_c = _spectrogram(combined.astype(np.float32, copy=False), int(sr), nperseg=1024, noverlap=768)
+                    Sxx_c_db = 10 * np.log10(Sxx_c + 1e-12)
+                    pcm2 = ax_c.pcolormesh(t_c, f_c, Sxx_c_db, shading="auto", cmap="magma")
+                    ax_c.set_ylabel("Hz")
+                    ax_c.set_xlabel("s")
+                    ax_c.set_title("Combined – Spectrogram")
+                    plt.colorbar(pcm2, ax=ax_c, fraction=0.046, pad=0.02, label="dB")
+                    st.pyplot(fig_c, use_container_width=True)
+                    plt.close(fig_c)
+                except Exception:
+                    pass
+
+                combined_wav = wav_bytes(combined, int(sr))
+                st.markdown("**Combined**")
+                st.audio(combined_wav, format="audio/wav")
+
+                combined_name = f"{Path(uploaded.name).stem}{suffix}.wav"
+                st.download_button("Download combined", data=combined_wav, file_name=combined_name, mime="audio/wav")
+            else:
+                st.info("Upload a WAV/FLAC/OGG file to create a combined output.")
+        else:
+            st.info("No input file uploaded; only the prompt is generated.")
 
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
