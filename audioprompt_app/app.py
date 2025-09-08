@@ -145,7 +145,7 @@ def build_prompt(
 
 
 st.title("AudioPrompt")
-st.markdown("**Quick Start**")
+st.subheader("Quick Start")
 top_left, top_right = st.columns([1, 1])
 with top_left:
     st.markdown(
@@ -175,7 +175,7 @@ with top_right:
         help="Processing rate; inputs are resampled. Higher SR costs more CPU.",
     )
 
-    st.subheader("Toggles")
+    st.markdown("**Toggles**")
     colA, colB, colC = st.columns(3)
     with colA:
         enable_melody = st.checkbox("Enable melody", value=True, help="Imprint a randomized melody (scale‑constrained) onto pink noise.")
@@ -183,7 +183,7 @@ with top_right:
         enable_focus = st.checkbox("Enable focus band", value=False, help="Emphasize energy in a vocal/guitar/bass band or a custom Hz range.")
     with colC:
         enable_gate = st.checkbox("Enable rhythmic gate", value=True, help="Apply a note‑shaped amplitude envelope for phrasing.")
-    prompt_seconds = st.slider("Prompt seconds", 1.0, 12.0, 4.0, 0.5, help="Length of the generated prompt (also used when prepending).")
+    # Prompt seconds moved to Output & Seed section for better workflow alignment
 
 # Main content columns
 st.divider()
@@ -284,6 +284,14 @@ with right:
 
     # Output & Seed
     st.markdown("**Output & Seed**")
+    prompt_seconds = st.slider(
+        "Prompt seconds",
+        1.0,
+        12.0,
+        4.0,
+        0.5,
+        help="Length of the generated prompt (also used when prepending).",
+    )
     colo1, colo2, colo3 = st.columns(3)
     with colo1:
         prompt_gain_db = st.slider("Prompt gain (dB)", -24.0, 6.0, -3.0, 0.5, help="Level for the prepended prompt.")
