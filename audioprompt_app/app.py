@@ -185,8 +185,8 @@ with top_right:
         enable_gate = st.checkbox("Enable rhythmic gate", value=True, help="Apply a note‑shaped amplitude envelope for phrasing.")
     # Prompt seconds moved to Output & Seed section for better workflow alignment
 
-# Main content columns
-st.divider()
+# Main content columns (add gentle spacing between top row and main content)
+st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 left, right = st.columns(2)
 
 with left:
@@ -282,6 +282,8 @@ with right:
             help="Frequencies below this are summed to mono while highs remain unchanged.",
         )
 
+    # Small spacing between Focus and Output & Seed
+    st.markdown("<div style='height: 12px'></div>", unsafe_allow_html=True)
     # Output & Seed
     st.markdown("**Output & Seed**")
     prompt_seconds = st.slider(
