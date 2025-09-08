@@ -6,6 +6,7 @@ import numpy as np
 import streamlit as st
 from scipy.signal import resample_poly
 import matplotlib.pyplot as plt
+import streamlit.components.v1 as components
 
 
 def _rms_dbfs(y: np.ndarray) -> float:
@@ -46,6 +47,15 @@ st.markdown(
     div[data-testid="stFileUploader"] > section:hover {
         border-color: var(--primary-color, #FF6B6B); background: rgba(255,107,107,0.06);
     }
+    /* Highlight when dragging files over (JS adds .dragging) */
+    div[data-testid="stFileUploader"] > section.dragging {
+        border-color: var(--primary-color, #FF6B6B) !important;
+        background: rgba(255,107,107,0.12) !important;
+    }
+    /* Fallback: focus within */
+    div[data-testid="stFileUploader"]:focus-within > section {
+        border-color: var(--primary-color, #FF6B6B);
+    }
     /* Align Seed input with Generate button height */
     .st-key-seed [data-testid="stNumberInputContainer"] { height: 56px; }
     .st-key-seed input[data-testid="stNumberInputField"] { height: 56px; padding-top: 0; padding-bottom: 0; }
@@ -54,6 +64,32 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# JS helper: add/remove .dragging class on the file-uploader drop zone during drag events
+_DRAG_JS = """
+<script>
+  (function attachDragHighlight(){
+    function wire(el){
+      if(el.__dragWired) return; el.__dragWired = true;
+      const sec = el.querySelector('section');
+      if(!sec) return;
+      let counter = 0;
+      function onEnter(e){ e.preventDefault(); counter++; sec.classList.add('dragging'); }
+      function onOver(e){ e.preventDefault(); sec.classList.add('dragging'); }
+      function onLeave(e){ counter--; if(counter<=0){ sec.classList.remove('dragging'); counter=0; } }
+      function onDrop(e){ sec.classList.remove('dragging'); counter=0; }
+      sec.addEventListener('dragenter', onEnter);
+      sec.addEventListener('dragover', onOver);
+      sec.addEventListener('dragleave', onLeave);
+      sec.addEventListener('drop', onDrop);
+    }
+    function scan(){
+      document.querySelectorAll('div[data-testid="stFileUploader"]').forEach(wire);
+    }
+    scan(); setInterval(scan, 1000);
+  })();
+</script>
+"""
 
 
 def clamp(v, lo, hi):
@@ -555,6 +591,9 @@ with right:
 
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
-st.caption(
-    "Terms & Privacy: Upload only content you have rights to. By using this app you confirm you have permission to process any uploaded audio."
-)
+    st.caption(
+        "Terms & Privacy: Upload only content you have rights to. By using this app you confirm you have permission to process any uploaded audio."
+    )
+
+# Inject drag-over highlight script at the end to avoid top spacer
+components.html(_DRAG_JS, height=0)
