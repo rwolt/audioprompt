@@ -18,7 +18,7 @@ Create short, steerable “audio prompts” to nudge AI music tools. AudioPrompt
 - Minimal CLI for analysis/prompt/prepend
 
 Supported formats
-- Input: WAV/FLAC/OGG/AIFF via libsndfile
+- Input: WAV/FLAC/OGG/AIFF via libsndfile; MP3 is supported if your libsndfile build includes MP3 (mpg123). If MP3 fails to load, convert to WAV/FLAC/OGG.
 - Output: WAV
 
 Requirements
@@ -74,7 +74,7 @@ Quick start (in the app)
 
 Tips
 - 3–6 s prompts give a clear steer without masking
-- Use WAV/FLAC inputs for reliability
+- Use WAV/FLAC inputs for best reliability; MP3 works when libsndfile has MP3 enabled
 
 ---
 

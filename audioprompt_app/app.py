@@ -234,9 +234,12 @@ with top_right:
     st.subheader("Input Audio")
     uploaded = st.file_uploader(
         "Input audio (optional)",
-        type=["wav", "flac", "ogg", "aiff", "aif"],
+        type=["wav", "flac", "ogg", "aiff", "aif", "mp3"],
         accept_multiple_files=False,
-        help="Drag & drop a file. If provided, the prompt will be prepended to create a combined output.",
+        help=(
+            "Drag & drop a file. If provided, the prompt will be prepended to create a combined output. "
+            "MP3 support depends on your libsndfile build."
+        ),
     )
     sr = st.number_input(
         "Sample rate (Hz)",
@@ -570,7 +573,11 @@ with right:
                 try:
                     x_local, sr_in_local = load_audio_mono(uploaded, int(sr))
                 except Exception as e:
-                    st.error(f"Failed to read input audio. Prefer WAV/FLAC/OGG. Error: {e}")
+                    st.error(
+                        "Failed to read input audio. Prefer WAV/FLAC/OGG. "
+                        "MP3 support depends on your libsndfile build.\n"
+                        f"Error: {e}"
+                    )
                     x_local = None
                 if x_local is not None:
                     target_len_local = int(round(float(prompt_seconds) * int(sr)))
@@ -651,7 +658,11 @@ with right:
             try:
                 x, sr_in = load_audio_mono(uploaded, int(sr))
             except Exception as e:
-                st.error(f"Failed to read input audio. Prefer WAV/FLAC/OGG. Error: {e}")
+                st.error(
+                    "Failed to read input audio. Prefer WAV/FLAC/OGG. "
+                    "MP3 support depends on your libsndfile build.\n"
+                    f"Error: {e}"
+                )
                 x = None
             if x is not None:
                 # Prepare prepend prompt slice with gain & fades

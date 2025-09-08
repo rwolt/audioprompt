@@ -26,6 +26,20 @@ def _as_readable(file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO, obje
     raise TypeError("Unsupported input type for audio loading.")
 
 
+def _is_mp3_name_or_type(obj: object) -> bool:
+    name = getattr(obj, "name", "") or str(obj)
+    mtype = getattr(obj, "type", "")
+    return str(name).lower().endswith(".mp3") or ("mpeg" in str(mtype).lower() or "mp3" in str(mtype).lower())
+
+
+def _mp3_supported() -> bool:
+    try:
+        fmts = sf.available_formats()
+        return "MP3" in fmts
+    except Exception:
+        return False
+
+
 def load_audio_mono(file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO, object], target_sr: int) -> Tuple[np.ndarray, int]:
     """Load audio, mix to mono float32, resample to target_sr.
 
@@ -34,6 +48,12 @@ def load_audio_mono(file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO, o
     WAV/FLAC uploads.
     """
     f = _as_readable(file_or_bytes)
+    # Helpful message if the user uploads MP3 but libsndfile lacks MP3 support
+    if _is_mp3_name_or_type(file_or_bytes) and not _mp3_supported():
+        raise RuntimeError(
+            "MP3 not supported by this libsndfile build. Install libsndfile with MP3 support "
+            "(mpg123) or convert to WAV/FLAC/OGG."
+        )
     data, sr = sf.read(f, always_2d=True, dtype="float32")
     x = data.mean(axis=1).astype(np.float32)
     if sr != target_sr:
