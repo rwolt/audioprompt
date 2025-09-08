@@ -261,33 +261,62 @@ with left:
 
 with right:
     st.subheader("Generate & Outputs")
-    # Focus (when enabled)
-    st.markdown("**Focus (optional)**")
+    # Focus with compact defaults and expandable advanced controls
+    st.markdown("**Focus**")
     focus_preset = st.radio(
         "Preset",
         options=["none", "vocal", "guitar", "bass", "custom"],
         index=1,
         horizontal=True,
-        help="Choose a preset band or ‘custom’ to set your own Hz range.",
+        help="Choose a preset band or select ‘custom’ to set your own Hz range.",
     )
-    if focus_preset == "custom":
-        band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
-    elif focus_preset == "none":
-        band = None
-    else:
-        band = None
-    colf1, colf2, colf3 = st.columns(3)
-    with colf1:
-        imprint_gain = st.slider("Imprint gain", 0.0, 16.0, 8.0, 0.5, help="Strength of harmonic emphasis.")
-    with colf2:
-        harmonics = st.slider("Harmonics", 0, 16, 10, 1, help="Number of harmonic peaks.")
-    with colf3:
-        bw_frac = st.slider("BW frac", 0.002, 0.05, 0.01, 0.001, help="Relative bandwidth around each harmonic.")
-    colf4, colf5 = st.columns(2)
-    with colf4:
-        floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
-    with colf5:
-        sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Steepness of the band edges.")
+    # Simple low-end checkbox directly under presets (sane default on)
+    tame_low_end = st.checkbox(
+        "Tame Low End",
+        value=True,
+        help="Reduce inaudible sub‑bass to free headroom and keep starts clean. Advanced controls in the expander.",
+    )
+
+    # Advanced controls (auto‑expand for custom preset)
+    with st.expander("Focus – Advanced", expanded=(focus_preset == "custom")):
+        if focus_preset == "custom":
+            band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
+        else:
+            band = None
+        colf1, colf2, colf3 = st.columns(3)
+        with colf1:
+            imprint_gain = st.slider("Imprint gain", 0.0, 16.0, 8.0, 0.5, help="Strength of harmonic emphasis.")
+        with colf2:
+            harmonics = st.slider("Harmonics", 0, 16, 10, 1, help="Number of harmonic peaks.")
+        with colf3:
+            bw_frac = st.slider("BW frac", 0.002, 0.05, 0.01, 0.001, help="Relative bandwidth around each harmonic.")
+        colf4, colf5 = st.columns(2)
+        with colf4:
+            floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
+        with colf5:
+            sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Steepness of the band edges.")
+
+        st.markdown("**Low‑End (advanced)**")
+        # Defaults for low‑end advanced section
+        hpf_cutoff_hz = st.slider(
+            "HPF cutoff (Hz)", 20, 40, 25, 1,
+            help="Frequencies below this are rolled off with a linear‑phase FIR filter.",
+        )
+        steepness = st.select_slider(
+            "Steepness",
+            options=["Normal", "Steep"],
+            value="Steep",
+            help="Filter length: Normal (~512 taps) or Steep (~2048 taps). Steeper = cleaner cutoff (more CPU).",
+        )
+        mono_lows = st.checkbox(
+            "Mono low frequencies",
+            value=True,
+            help="Sum bass to mono (e.g., <120 Hz) to keep low end tight. Mostly relevant for stereo prompts.",
+        )
+        mono_cutoff_hz = st.slider(
+            "Mono below (Hz)", 80, 180, 120, 5,
+            help="Frequencies below this are summed to mono while highs remain unchanged.",
+        )
 
     # Output & Seed
     st.markdown("**Output & Seed**")
@@ -330,7 +359,13 @@ with right:
     imprint_params = dict(gain=imprint_gain, harmonics=harmonics, bw_frac=bw_frac, floor_db=floor_db, sharpness=sharpness, n_fft=2048)
     # Low-end config dict for core processing
     hpf_taps = 2049 if steepness == "Steep" else 513
-    lowend_cfg = dict(tame_low_end=bool(tame_low_end), hpf_cutoff_hz=int(hpf_cutoff_hz), hpf_taps=int(hpf_taps), mono_lows=bool(mono_lows), mono_cutoff_hz=int(mono_cutoff_hz))
+    lowend_cfg = dict(
+        tame_low_end=bool(tame_low_end),
+        hpf_cutoff_hz=int(hpf_cutoff_hz),
+        hpf_taps=int(hpf_taps),
+        mono_lows=bool(mono_lows),
+        mono_cutoff_hz=int(mono_cutoff_hz),
+    )
 
     # Big colorful button to generate the prompt
     pressed = st.button("Generate Prompt", type="primary", use_container_width=True)
