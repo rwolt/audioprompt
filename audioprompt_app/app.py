@@ -146,20 +146,19 @@ def build_prompt(
 
 st.title("AudioPrompt")
 st.markdown("**Quick Start**")
-st.markdown(
-    """
-    1. Drag‑drop an audio file (optional).
-    2. Set Prompt seconds and choose Melody settings (scale, range, BPM).
-    3. (Optional) Enable Focus to emphasize a vocal/guitar/bass band or custom Hz range.
-    4. Press Generate Prompt, then preview and download the Prompt and Combined outputs.
-    
-    Tips: 3–6 s prompts give a clear steer without masking; try Minor Blues + Vocal focus for vocal‑friendly nudges.
-    """
-)
-
-left, right = st.columns(2)
-
-with left:
+top_left, top_right = st.columns([1, 1])
+with top_left:
+    st.markdown(
+        """
+        1. Drag‑drop an audio file (optional).
+        2. Set Prompt seconds and choose Melody settings (scale, range, BPM).
+        3. (Optional) Enable Focus to emphasize a vocal/guitar/bass band or custom Hz range.
+        4. Press Generate Prompt, then preview and download the Prompt and Combined outputs.
+        
+        Tips: 3–6 s prompts give a clear steer without masking; try Minor Blues + Vocal focus for vocal‑friendly nudges.
+        """
+    )
+with top_right:
     st.subheader("Input & Output")
     uploaded = st.file_uploader(
         "Input audio (optional)",
@@ -176,7 +175,6 @@ with left:
         help="Processing rate; inputs are resampled. Higher SR costs more CPU.",
     )
 
-    st.divider()
     st.subheader("Toggles")
     colA, colB, colC = st.columns(3)
     with colA:
@@ -185,47 +183,13 @@ with left:
         enable_focus = st.checkbox("Enable focus band", value=False, help="Emphasize energy in a vocal/guitar/bass band or a custom Hz range.")
     with colC:
         enable_gate = st.checkbox("Enable rhythmic gate", value=True, help="Apply a note‑shaped amplitude envelope for phrasing.")
-
     prompt_seconds = st.slider("Prompt seconds", 1.0, 12.0, 4.0, 0.5, help="Length of the generated prompt (also used when prepending).")
 
-    st.divider()
-    with st.expander("Low‑End (advanced)", expanded=False):
-        # Two simple toggles side‑by‑side to reduce clutter
-        tcol1, tcol2 = st.columns(2)
-        with tcol1:
-            tame_low_end = st.checkbox(
-                "Tame low end (HPF)",
-                value=False,
-                help="High‑pass below ~20–40 Hz to remove inaudible rumble and free headroom. Keeps the pink tilt above the cutoff.",
-            )
-        with tcol2:
-            mono_lows = st.checkbox(
-                "Mono low frequencies",
-                value=False,
-                help="Sum bass to mono (e.g., <120 Hz) to keep low end tight. Mostly relevant for stereo prompts.",
-            )
+# Main content columns
+st.divider()
+left, right = st.columns(2)
 
-        # Show detailed controls only when enabled
-        hpf_cutoff_hz, steepness = 25, "Steep"
-        mono_cutoff_hz = 120
-        if tame_low_end:
-            st.markdown("**High‑pass settings**")
-            hpf_cutoff_hz = st.slider(
-                "HPF cutoff (Hz)", 20, 40, 25, 1,
-                help="Frequencies below this are rolled off with a linear‑phase FIR filter.",
-            )
-            steepness = st.select_slider(
-                "Steepness",
-                options=["Normal", "Steep"],
-                value="Steep",
-                help="Filter length: Normal (~512 taps) or Steep (~2048 taps). Steeper = cleaner cutoff (more CPU).",
-            )
-        if mono_lows:
-            st.markdown("**Mono‑lows settings**")
-            mono_cutoff_hz = st.slider(
-                "Mono below (Hz)", 80, 180, 120, 5,
-                help="Frequencies below this are summed to mono while highs remain unchanged.",
-            )
+with left:
 
     st.divider()
     st.subheader("Melody (when enabled)")
