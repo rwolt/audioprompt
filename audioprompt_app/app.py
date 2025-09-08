@@ -349,24 +349,29 @@ with left:
         )
     else:
         focus_preset = "none"
-    with st.expander("Focus Band – Advanced", expanded=(enable_focus and focus_preset == "custom")):
-        if enable_focus and focus_preset == "custom":
-            band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
-        else:
-            band = None
-        colf1, colf2, colf3 = st.columns(3)
-        with colf1:
-            imprint_gain = st.slider("Imprint gain", 0.0, 16.0, 8.0, 0.5, help="Strength of harmonic emphasis.")
-        with colf2:
-            harmonics = st.slider("Harmonics", 0, 16, 10, 1, help="Number of harmonic peaks.")
-        with colf3:
-            bw_frac = st.slider("BW frac", 0.002, 0.05, 0.01, 0.001, help="Relative bandwidth around each harmonic.")
-        colf4, colf5 = st.columns(2)
-        with colf4:
-            floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
-        with colf5:
-            sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Steepness of the band edges.")
-        # Low‑end advanced controls hidden for now; using sensible defaults
+    # Only show Advanced controls when focus is enabled; otherwise use defaults
+    if enable_focus:
+        with st.expander("Focus Band – Advanced", expanded=(focus_preset == "custom")):
+            if focus_preset == "custom":
+                band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
+            else:
+                band = None
+            colf1, colf2, colf3 = st.columns(3)
+            with colf1:
+                imprint_gain = st.slider("Imprint gain", 0.0, 16.0, 8.0, 0.5, help="Strength of harmonic emphasis.")
+            with colf2:
+                harmonics = st.slider("Harmonics", 0, 16, 10, 1, help="Number of harmonic peaks.")
+            with colf3:
+                bw_frac = st.slider("BW frac", 0.002, 0.05, 0.01, 0.001, help="Relative bandwidth around each harmonic.")
+            colf4, colf5 = st.columns(2)
+            with colf4:
+                floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
+            with colf5:
+                sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Steepness of the band edges.")
+            # Low‑end advanced controls hidden for now; using sensible defaults
+    else:
+        band = None
+        imprint_gain, harmonics, bw_frac, floor_db, sharpness = 8.0, 10, 0.01, -18.0, 12
 
     # Build Focus/imprint/low‑end configs for generation
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
@@ -417,7 +422,7 @@ with right:
         vib_depth=float(vib_depth),
     )
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
-    imprint_params = dict(gain=imprint_gain, harmonics=harmonics, bw_frac=bw_frac, floor_db=floor_db, sharpness=sharpness, n_fft=2048)
+    imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
     # Low-end config dict for core processing
     hpf_taps = 2049  # Steep by default
     lowend_cfg = dict(
