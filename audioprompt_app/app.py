@@ -242,7 +242,8 @@ with left:
     # Output & Seed and Focus controls moved to the right column to balance layout
 
 with right:
-    st.subheader("Generate & Outputs")
+    # Reserve a container at the top for Generate & Outputs so it's visually above
+    gen_top = st.container()
     # Focus with compact defaults and expandable advanced controls
     st.markdown("**Focus**")
     enable_focus = st.checkbox(
@@ -390,59 +391,61 @@ with right:
         mono_cutoff_hz=int(mono_cutoff_hz),
     )
 
-    # Big colorful button to generate the prompt
-    pressed = st.button("Generate Prompt", type="primary", use_container_width=True)
+    # Render Generate & Outputs at the top of the right column
+    with gen_top:
+        st.subheader("Generate & Outputs")
+        pressed = st.button("Generate Prompt", type="primary", use_container_width=True)
 
-    # Auto-generate once on first load
-    auto_first = ("y_prompt" not in st.session_state)
-    if pressed or auto_first:
-        with st.spinner("Generating prompt..."):
-            # Resolve seed: -1 means random each generation
-            seed_input = int(st.session_state.get("seed", 7))
-            seed_to_use = int(np.random.randint(0, 10_000_000)) if seed_input == -1 else seed_input
-            y_prompt, events = build_prompt(
-                sr=int(sr),
-                prompt_seconds=float(prompt_seconds),
-                seed=seed_to_use,
-                enable_melody=bool(enable_melody),
-                melody_params=melody_params,
-                enable_focus=bool(enable_focus),
-                focus_params=focus_params,
-                enable_gate=bool(enable_gate),
-                imprint_params=imprint_params,
-                lowend_cfg=lowend_cfg,
-            )
-            st.session_state["y_prompt"], st.session_state["events"] = y_prompt, events
-            st.session_state["seed_used"] = seed_to_use
-            st.session_state["prompt_sr"] = int(sr)
+        # Auto-generate once on first load
+        auto_first = ("y_prompt" not in st.session_state)
+        if pressed or auto_first:
+            with st.spinner("Generating prompt..."):
+                # Resolve seed: -1 means random each generation
+                seed_input = int(st.session_state.get("seed", 7))
+                seed_to_use = int(np.random.randint(0, 10_000_000)) if seed_input == -1 else seed_input
+                y_prompt, events = build_prompt(
+                    sr=int(sr),
+                    prompt_seconds=float(prompt_seconds),
+                    seed=seed_to_use,
+                    enable_melody=bool(enable_melody),
+                    melody_params=melody_params,
+                    enable_focus=bool(enable_focus),
+                    focus_params=focus_params,
+                    enable_gate=bool(enable_gate),
+                    imprint_params=imprint_params,
+                    lowend_cfg=lowend_cfg,
+                )
+                st.session_state["y_prompt"], st.session_state["events"] = y_prompt, events
+                st.session_state["seed_used"] = seed_to_use
+                st.session_state["prompt_sr"] = int(sr)
 
-    if "y_prompt" not in st.session_state:
-        st.info("Set your parameters and press Generate Prompt.")
-        st.stop()
+        if "y_prompt" not in st.session_state:
+            st.info("Set your parameters and press Generate Prompt.")
+            st.stop()
 
-    y_prompt = st.session_state["y_prompt"]
-    events = st.session_state.get("events")
+        y_prompt = st.session_state["y_prompt"]
+        events = st.session_state.get("events")
 
-    # Prompt preview and download
-    st.markdown("**Prompt**")
-    sr_prompt = int(st.session_state.get("prompt_sr", int(sr)))
-    # Spectrogram preview (Prompt)
-    try:
-        from scipy.signal import spectrogram as _spectrogram
-        fig_p, ax_p = plt.subplots(figsize=(6, 2.4))
-        f_p, t_p, Sxx_p = _spectrogram(y_prompt.astype(np.float32, copy=False), sr_prompt, nperseg=1024, noverlap=768)
-        Sxx_p_db = 10 * np.log10(Sxx_p + 1e-12)
-        pcm = ax_p.pcolormesh(t_p, f_p, Sxx_p_db, shading="auto", cmap="magma")
-        ax_p.set_ylabel("Hz")
-        ax_p.set_xlabel("s")
-        ax_p.set_title("Prompt – Spectrogram")
-        plt.colorbar(pcm, ax=ax_p, fraction=0.046, pad=0.02, label="dB")
-        st.pyplot(fig_p, use_container_width=True)
-        plt.close(fig_p)
-    except Exception:
-        pass
-    prompt_wav = wav_bytes(y_prompt, sr_prompt)
-    st.audio(prompt_wav, format="audio/wav")
+        # Prompt preview and download
+        st.markdown("**Prompt**")
+        sr_prompt = int(st.session_state.get("prompt_sr", int(sr)))
+        # Spectrogram preview (Prompt)
+        try:
+            from scipy.signal import spectrogram as _spectrogram
+            fig_p, ax_p = plt.subplots(figsize=(6, 2.4))
+            f_p, t_p, Sxx_p = _spectrogram(y_prompt.astype(np.float32, copy=False), sr_prompt, nperseg=1024, noverlap=768)
+            Sxx_p_db = 10 * np.log10(Sxx_p + 1e-12)
+            pcm = ax_p.pcolormesh(t_p, f_p, Sxx_p_db, shading="auto", cmap="magma")
+            ax_p.set_ylabel("Hz")
+            ax_p.set_xlabel("s")
+            ax_p.set_title("Prompt – Spectrogram")
+            plt.colorbar(pcm, ax=ax_p, fraction=0.046, pad=0.02, label="dB")
+            st.pyplot(fig_p, use_container_width=True)
+            plt.close(fig_p)
+        except Exception:
+            pass
+        prompt_wav = wav_bytes(y_prompt, sr_prompt)
+        st.audio(prompt_wav, format="audio/wav")
 
     # Tagged filenames
     if uploaded is not None:
