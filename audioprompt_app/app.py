@@ -14,21 +14,21 @@ def _rms_dbfs(y: np.ndarray) -> float:
     rms = float(np.sqrt(np.mean(y * y)) + 1e-12)
     return 20.0 * np.log10(rms)
 
-# Import core from ./src
-sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
-from audioprompt_core import (
-    SCALES,
-    load_audio_mono,
-    apply_fades,
-    wav_bytes,
-    tag_suffix,
+# Import core from ./src (ensure our local package takes precedence)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+# Import directly from submodules to avoid package-level side effects
+from audioprompt_core.audio import load_audio_mono, apply_fades, wav_bytes, tag_suffix
+from audioprompt_core.prompt import (
     pink_noise,
     imprint_melody_focus,
     rhythmic_gate_from_events,
-    generate_random_melody,
-    events_to_f0,
     apply_hpf,
     apply_mono_lows,
+)
+from audioprompt_core.melody import (
+    SCALES,
+    generate_random_melody,
+    events_to_f0,
 )
 
 
