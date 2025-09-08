@@ -326,16 +326,19 @@ with left:
     st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
     # Focus (left) — for future tabs, keep flat containers
     st.subheader("Focus")
-    enable_focus = st.checkbox(
-        "Enable focus band",
-        value=False,
-        help="Emphasize energy in a vocal/guitar/bass band or a custom Hz range.",
-    )
-    tame_low_end = st.checkbox(
-        "Rumble Ward",
-        value=True,
-        help="Reduce sub‑bass rumble and tighten lows (HPF + mono‑lows under the hood).",
-    )
+    fcol1, fcol2 = st.columns([1,1])
+    with fcol1:
+        enable_focus = st.checkbox(
+            "Enable focus band",
+            value=False,
+            help="Emphasize energy in a vocal/guitar/bass band or a custom Hz range.",
+        )
+    with fcol2:
+        tame_low_end = st.checkbox(
+            "Bass Roll-Off",
+            value=True,
+            help="Removes sub-bass rumble for cleaner starts and more headroom.",
+        )
     if enable_focus:
         focus_preset = st.radio(
             "Preset",
