@@ -200,7 +200,7 @@ with top_left:
         AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It can imprint a scale‑based melody, emphasize a frequency band (vocal/guitar/bass/custom), and prepend the prompt to your input audio.
 
         1. Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only.
-        2. Set Prompt seconds and choose Melody settings (root/scale/BPM). Default is E minor pentatonic.
+        2. Set Prompt seconds and choose Melody settings (root/scale/BPM).
         3. Use Focus (or Custom band) and enable Tame Low End for cleaner results.
         4. Click Generate Prompt. Preview the Prompt, and if input audio is provided, the Combined result. Download the tagged WAVs.
 
