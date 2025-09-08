@@ -175,14 +175,7 @@ with top_right:
         help="Processing rate; inputs are resampled. Higher SR costs more CPU.",
     )
 
-    st.markdown("**Toggles**")
-    colA, colB, colC = st.columns(3)
-    with colA:
-        enable_melody = st.checkbox("Enable melody", value=True, help="Imprint a randomized melody (scale‑constrained) onto pink noise.")
-    with colB:
-        enable_focus = st.checkbox("Enable focus band", value=False, help="Emphasize energy in a vocal/guitar/bass band or a custom Hz range.")
-    with colC:
-        enable_gate = st.checkbox("Enable rhythmic gate", value=True, help="Apply a note‑shaped amplitude envelope for phrasing.")
+    # Toggles moved next to relevant sections below
     # Prompt seconds moved to Output & Seed section for better workflow alignment
 
 # Single divider spanning both columns to separate top row from main content
@@ -191,34 +184,53 @@ left, right = st.columns(2)
 
 with left:
 
-    st.subheader("Melody (when enabled)")
-    roots = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
-    melody_root = st.selectbox("Root", roots, index=roots.index("E"), help="Root note for the scale (C4=60).")
-    scales = sorted(list(SCALES.keys()))
-    melody_scale = st.selectbox("Scale", options=scales, index=scales.index("minor_blues") if "minor_blues" in scales else 0, help="Choose from major/modes, pentatonics, blues, etc.")
+    st.subheader("Melody")
+    mcol1, mcol2 = st.columns([1,1])
+    with mcol1:
+        enable_melody = st.checkbox(
+            "Enable melody",
+            value=True,
+            help="Imprint a randomized melody (scale‑constrained) onto pink noise.",
+        )
+    with mcol2:
+        enable_gate = st.checkbox(
+            "Rhythmic gate",
+            value=True,
+            help="Apply a note‑shaped amplitude envelope for phrasing.",
+        )
+    if enable_melody:
+        roots = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
+        melody_root = st.selectbox("Root", roots, index=roots.index("E"), help="Root note for the scale (C4=60).")
+        scales = sorted(list(SCALES.keys()))
+        melody_scale = st.selectbox("Scale", options=scales, index=scales.index("minor_blues") if "minor_blues" in scales else 0, help="Choose from major/modes, pentatonics, blues, etc.")
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        bpm = st.slider("BPM", 40, 220, 96, 1, help="Tempo driving randomized note durations.")
-    with col2:
-        low_midi = st.slider("Low MIDI", 24, 84, 55, 1, help="Register floor (C4=60).")
-    with col3:
-        high_midi = st.slider("High MIDI", 36, 96, 79, 1, help="Register ceiling. Keep Low < High.")
-    col4, col5, col6 = st.columns(3)
-    with col4:
-        step_bias = st.slider("Step bias", 0.0, 1.0, 0.8, 0.01, help="Probability of moving to a neighboring scale degree.")
-    with col5:
-        leap_steps = st.slider("Max leap (scale steps)", 1, 8, 4, 1, help="Largest jump when not stepping.")
-    with col6:
-        rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.12, 0.01, help="Chance of rests vs notes.")
-    col7, col8, col9 = st.columns(3)
-    with col7:
-        glide_prob = st.slider("Glide prob", 0.0, 1.0, 0.25, 0.01, help="Probability of sliding into the next note.")
-    with col8:
-        glide_frac = st.slider("Glide frac", 0.0, 0.9, 0.35, 0.01, help="Portion of the note duration spent gliding.")
-    with col9:
-        vib_hz = st.slider("Vibrato Hz", 3.0, 9.0, 5.5, 0.1, help="Rate of pitch modulation.")
-    vib_depth = st.slider("Vibrato depth", 0.0, 0.05, 0.02, 0.001, help="Depth of pitch modulation (fraction).")
+        col1, col2 = st.columns(2)
+        with col1:
+            bpm = st.slider("BPM", 40, 220, 96, 1, help="Tempo driving randomized note durations.")
+        with col2:
+            vib_hz = st.slider("Vibrato Hz", 3.0, 9.0, 5.5, 0.1, help="Rate of pitch modulation.")
+        vib_depth = st.slider("Vibrato depth", 0.0, 0.05, 0.02, 0.001, help="Depth of pitch modulation (fraction).")
+
+        with st.expander("Melody – Advanced", expanded=False):
+            colA1, colA2 = st.columns(2)
+            with colA1:
+                low_midi = st.slider("Low MIDI", 24, 84, 55, 1, help="Register floor (C4=60).")
+                step_bias = st.slider("Step bias", 0.0, 1.0, 0.8, 0.01, help="Probability of moving to a neighboring scale degree.")
+                glide_prob = st.slider("Glide prob", 0.0, 1.0, 0.25, 0.01, help="Probability of sliding into the next note.")
+            with colA2:
+                high_midi = st.slider("High MIDI", 36, 96, 79, 1, help="Register ceiling. Keep Low < High.")
+                leap_steps = st.slider("Max leap (scale steps)", 1, 8, 4, 1, help="Largest jump when not stepping.")
+                glide_frac = st.slider("Glide frac", 0.0, 0.9, 0.35, 0.01, help="Portion of the note duration spent gliding.")
+            rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.12, 0.01, help="Chance of rests vs notes.")
+    else:
+        # Provide defaults when melody disabled to keep variables defined
+        melody_root = "E"
+        melody_scale = "minor_blues"
+        bpm = 96
+        low_midi, high_midi = 55, 79
+        step_bias, leap_steps, rest_prob = 0.8, 4, 0.12
+        glide_prob, glide_frac = 0.25, 0.35
+        vib_hz, vib_depth = 5.5, 0.02
 
     # Output & Seed and Focus controls moved to the right column to balance layout
 
@@ -226,13 +238,21 @@ with right:
     st.subheader("Generate & Outputs")
     # Focus with compact defaults and expandable advanced controls
     st.markdown("**Focus**")
-    focus_preset = st.radio(
-        "Preset",
-        options=["none", "vocal", "guitar", "bass", "custom"],
-        index=1,
-        horizontal=True,
-        help="Choose a preset band or select ‘custom’ to set your own Hz range.",
+    enable_focus = st.checkbox(
+        "Enable focus band",
+        value=False,
+        help="Emphasize energy in a vocal/guitar/bass band or a custom Hz range.",
     )
+    if enable_focus:
+        focus_preset = st.radio(
+            "Preset",
+            options=["vocal", "guitar", "bass", "custom"],
+            index=0,
+            horizontal=True,
+            help="Choose a preset band or select ‘custom’ to set your own Hz range.",
+        )
+    else:
+        focus_preset = "none"
     # Simple low-end checkbox directly under presets (sane default on)
     tame_low_end = st.checkbox(
         "Tame Low End",
@@ -241,8 +261,8 @@ with right:
     )
 
     # Advanced controls (auto‑expand for custom preset)
-    with st.expander("Focus – Advanced", expanded=(focus_preset == "custom")):
-        if focus_preset == "custom":
+    with st.expander("Focus – Advanced", expanded=(enable_focus and focus_preset == "custom")):
+        if enable_focus and focus_preset == "custom":
             band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
         else:
             band = None
