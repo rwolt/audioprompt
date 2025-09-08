@@ -46,6 +46,10 @@ st.markdown(
     div[data-testid="stFileUploader"] > section:hover {
         border-color: var(--primary-color, #FF6B6B); background: rgba(255,107,107,0.06);
     }
+    /* Align Seed input with Generate button height */
+    .st-key-seed [data-testid="stNumberInputContainer"] { height: 56px; }
+    .st-key-seed input[data-testid="stNumberInputField"] { height: 56px; padding-top: 0; padding-bottom: 0; }
+    .st-key-seed { margin-top: 0 !important; margin-bottom: 0 !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -407,7 +411,6 @@ with right:
         with btn_col:
             pressed = st.button("Generate Prompt", type="primary", use_container_width=True)
         with seed_col:
-            st.markdown("<div style='font-weight:600; margin-bottom:4px;'>Seed</div>", unsafe_allow_html=True)
             seed = st.number_input(
                 "Seed",
                 min_value=-1,
