@@ -544,8 +544,9 @@ with right:
                 prompt_only_name_local += "none"
             prompt_only_name_local += f"_seed-{seed_val_local}.wav"
 
-            # Prompt audio + download
+            # Prompt audio + download (seed shown above)
             st.markdown("**Prompt**")
+            st.caption(f"Seed used: {seed_val_local}")
             prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
             st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
             ap_col_audio, ap_col_btn = st.columns([4,1], gap="small")
@@ -617,35 +618,7 @@ with right:
         else:
             y_prompt = st.session_state["y_prompt"]
             events = st.session_state.get("events")
-
-        # Spectrogram previews only (no audio or downloads)
-        # Show seed info above the spectrograms (after audio players)
-        if "y_prompt" in st.session_state:
-            seed_val = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
-            st.caption(f"Seed used: {seed_val}")
-        st.subheader("Spectrograms")
-        if "y_prompt" in st.session_state:
-            st.markdown("**Prompt**")
-            # Ensure local variables exist before use
-            y_prompt = st.session_state["y_prompt"]
-            sr_prompt = int(st.session_state.get("prompt_sr", int(sr)))
-            # Spectrogram preview (Prompt)
-            try:
-                from scipy.signal import spectrogram as _spectrogram
-                fig_p, ax_p = plt.subplots(figsize=(6, 2.4))
-                f_p, t_p, Sxx_p = _spectrogram(y_prompt.astype(np.float32, copy=False), sr_prompt, nperseg=1024, noverlap=768)
-                Sxx_p_db = 10 * np.log10(Sxx_p + 1e-12)
-                pcm = ax_p.pcolormesh(t_p, f_p, Sxx_p_db, shading="auto", cmap="magma")
-                ax_p.set_ylabel("Hz")
-                ax_p.set_xlabel("s")
-                ax_p.set_title("Prompt – Spectrogram")
-                plt.colorbar(pcm, ax=ax_p, fraction=0.046, pad=0.02, label="dB")
-                st.pyplot(fig_p, width="stretch")
-                plt.close(fig_p)
-            except Exception:
-                pass
-
-        # Combined output spectrogram if file provided
+        # Remove spectrograms section from UI; keep combined info message behavior
         if uploaded is not None and "y_prompt" in st.session_state:
             try:
                 x, sr_in = load_audio_mono(uploaded, int(sr))
@@ -656,51 +629,9 @@ with right:
                     f"Error: {e}"
                 )
                 x = None
-            if x is not None:
-                # Prepare prepend prompt slice with gain & fades
-                target_len = int(round(float(prompt_seconds) * int(sr)))
-                prompt = y_prompt
-                # Resample prompt if its SR differs
-                if sr_prompt != int(sr):
-                    g = np.gcd(sr_prompt, int(sr))
-                    prompt = resample_poly(prompt, int(sr) // g, sr_prompt // g).astype(np.float32)
-                prompt = prompt[:target_len]
-                # Determine prompt gain: auto or manual
-                if auto_gain:
-                    try:
-                        seed_rms_db = _rms_dbfs(x)
-                        prompt_rms_db = _rms_dbfs(prompt[:target_len]) if target_len > 0 else _rms_dbfs(prompt)
-                        desired_db = seed_rms_db + float(auto_gain_offset_db)
-                        gain_db = desired_db - prompt_rms_db
-                    except Exception:
-                        gain_db = float(prompt_gain_db)
-                else:
-                    gain_db = float(prompt_gain_db)
-                gain = 10 ** (gain_db / 20.0)
-                prompt = apply_fades(prompt * gain, int(sr), int(fade_in_ms), int(fade_out_ms))
-                combined = np.concatenate([prompt.astype(np.float32, copy=False), x.astype(np.float32, copy=False)], axis=0)
-                peak = float(np.max(np.abs(combined)) + 1e-12)
-                if peak > 0.999:
-                    combined = (combined / peak * 0.999).astype(np.float32)
-
-                # Combined spectrogram label above the image, then plot
-                st.markdown("**Combined**")
-                try:
-                    fig_c, ax_c = plt.subplots(figsize=(6, 2.4))
-                    f_c, t_c, Sxx_c = _spectrogram(combined.astype(np.float32, copy=False), int(sr), nperseg=1024, noverlap=768)
-                    Sxx_c_db = 10 * np.log10(Sxx_c + 1e-12)
-                    pcm2 = ax_c.pcolormesh(t_c, f_c, Sxx_c_db, shading="auto", cmap="magma")
-                    ax_c.set_ylabel("Hz")
-                    ax_c.set_xlabel("s")
-                    ax_c.set_title("Combined – Spectrogram")
-                    plt.colorbar(pcm2, ax=ax_c, fraction=0.046, pad=0.02, label="dB")
-                    st.pyplot(fig_c, width="stretch")
-                    plt.close(fig_c)
-                except Exception:
-                    pass
-            else:
+            if x is None:
                 st.info("Upload a WAV/FLAC/OGG file to create a combined output.")
-        else:
+        elif uploaded is None:
             st.info("No input file uploaded; only the prompt is generated.")
 
 # Footer: brief Terms & Privacy notice (public hosting)
