@@ -416,8 +416,7 @@ with right:
                 key="seed",
             )
 
-        # Output & Seed just beneath Generate
-        st.subheader("Output & Seed")
+        # Output & Seed just beneath Generate (no separate heading to reduce clutter)
         prompt_seconds = st.slider(
             "Prompt seconds",
             1.0,
@@ -591,9 +590,9 @@ with right:
 
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
-    st.caption(
-        "Terms & Privacy: Upload only content you have rights to. By using this app you confirm you have permission to process any uploaded audio."
-    )
+st.caption(
+    "Terms & Privacy: Upload only content you have rights to. By using this app you confirm you have permission to process any uploaded audio."
+)
 
 # Inject drag-over highlight script at the end to avoid top spacer
 components.html(_DRAG_JS, height=0)

@@ -1,4 +1,4 @@
-# AudioPrompt — Streamlit App, Notebook, and CLI
+# AudioPrompt — Streamlit App and CLI
 
 Create short, steerable “audio prompts” to nudge AI music tools. AudioPrompt can imprint a scale‑constrained melody onto pink noise, emphasize vocal/guitar/bass bands, and prepend the prompt to your track for upload.
 
@@ -15,7 +15,6 @@ Create short, steerable “audio prompts” to nudge AI music tools. AudioPrompt
 
 ## 📦 What’s Included
 - Streamlit App (local or Streamlit Community Cloud)
-- Jupyter Notebook (`audioprompt_workbook.ipynb`)
 - Minimal CLI for analysis/prompt/prepend
 
 Supported formats
@@ -78,13 +77,6 @@ Tips
 
 ---
 
-## 📓 Notebook (`audioprompt_workbook.ipynb`)
-- Open the workbook and run cells top‑to‑bottom.
-- Set `INPUT_AUDIO`, `PROMPT_SECONDS`, and toggles (Melody, Focus, Gate).
-- Preview `y_prompt`; optionally prepend and export tagged WAVs.
-
----
-
 ## 🧪 CLI (headless)
 
 Usage
@@ -122,7 +114,6 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 ## 📁 Project Layout
 - `audioprompt_app/` — Streamlit app (two‑column UI, dark theme, drag‑drop upload)
 - `audioprompt_app/src/audioprompt_core/` — shared core (audio, melody, prompt)
-- `audioprompt_workbook.ipynb` — shareable workbook version of the workflow
 - `audioprompt.py` — CLI (analyze/prompt/prepend)
 - `requirements.txt` — minimal dependencies for the CLI/analysis tools
 
