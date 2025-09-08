@@ -240,7 +240,7 @@ with left:
         vib_hz, vib_depth = 5.5, 0.02
 
     # Focus (left) — for future tabs, keep flat containers
-    st.markdown("**Focus**")
+    st.subheader("Focus")
     enable_focus = st.checkbox(
         "Enable focus band",
         value=False,
@@ -369,16 +369,7 @@ with right:
         fade_in_ms = st.slider("Fade-in (ms)", 0, 200, 10, 1, help="Smooth ramp at the start.")
     with colo3:
         fade_out_ms = st.slider("Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end.")
-    # Seed: enter -1 to randomize each generation
-    seed = st.number_input(
-        "Seed",
-        min_value=-1,
-        max_value=10_000_000,
-        value=-1,
-        step=1,
-        help="Controls randomness for pink noise and the melody (notes, glides, etc.). Set to -1 to use a new random seed each generation.",
-        key="seed",
-    )
+    # Seed control moved next to Generate button
     output_suffix = "_with_prompt"
     # Collect params for generation
     melody_params = dict(
@@ -412,7 +403,19 @@ with right:
     # Render Generate & Outputs at the top of the right column
     with gen_top:
         st.subheader("Generate & Outputs")
-        pressed = st.button("Generate Prompt", type="primary", use_container_width=True)
+        btn_col, seed_col = st.columns([2,1])
+        with btn_col:
+            pressed = st.button("Generate Prompt", type="primary", use_container_width=True)
+        with seed_col:
+            seed = st.number_input(
+                "Seed",
+                min_value=-1,
+                max_value=10_000_000,
+                value=-1,
+                step=1,
+                help="Controls randomness for pink noise and the melody (notes, glides, etc.). Set to -1 to use a new random seed each generation.",
+                key="seed",
+            )
 
         # Auto-generate once on first load
         auto_first = ("y_prompt" not in st.session_state)
@@ -444,7 +447,8 @@ with right:
         y_prompt = st.session_state["y_prompt"]
         events = st.session_state.get("events")
 
-        # Prompt preview and download
+        # Preview (spectrograms + players)
+        st.markdown("**Preview**")
         st.markdown("**Prompt**")
         sr_prompt = int(st.session_state.get("prompt_sr", int(sr)))
         # Spectrogram preview (Prompt)
