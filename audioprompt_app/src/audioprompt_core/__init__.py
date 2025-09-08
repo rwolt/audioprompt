@@ -1,6 +1,12 @@
 from .audio import load_audio_mono, apply_fades, wav_bytes, tag_suffix
 from .melody import SCALES, generate_random_melody, events_to_f0
-from .prompt import pink_noise, imprint_melody_focus, rhythmic_gate_from_events
+from .prompt import (
+    pink_noise,
+    imprint_melody_focus,
+    rhythmic_gate_from_events,
+    apply_hpf,
+    apply_mono_lows,
+)
 
 __all__ = [
     "load_audio_mono",
@@ -13,4 +19,6 @@ __all__ = [
     "pink_noise",
     "imprint_melody_focus",
     "rhythmic_gate_from_events",
+    "apply_hpf",
+    "apply_mono_lows",
 ]
