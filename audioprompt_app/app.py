@@ -36,9 +36,11 @@ st.set_page_config(page_title="AudioPrompt", layout="wide")
 st.markdown(
     """
     <style>
-    .block-container{padding-top:1rem;padding-bottom:2rem;}
+    .block-container{padding-top:1rem;padding-bottom:0.75rem; max-width:80vw; margin-left:auto; margin-right:auto;}
     /* Keep Streamlit's primary theme color for the button; minimal tweaks only */
     div.stButton > button[kind="primary"] { padding: 0.9rem 1.25rem; font-size: 1.05rem; border-radius: 10px; }
+    /* Prevent download labels from wrapping */
+    div.stButton > button { white-space: nowrap; }
     /* Style the file uploader like a drop zone */
     div[data-testid="stFileUploader"] > section {
         border: 2px dashed rgba(255,255,255,0.2);
@@ -56,11 +58,31 @@ st.markdown(
     div[data-testid="stFileUploader"]:focus-within > section {
         border-color: var(--primary-color, #FF6B6B);
     }
-    /* Seed stack: small label + shorter input to match button height */
-    .seed-label { font-weight:600; margin: 0 0 4px 0; line-height: 1; font-size: 0.9rem; }
-    .st-key-seed [data-testid="stNumberInputContainer"] { height: 40px; }
-    .st-key-seed input[data-testid="stNumberInputField"] { height: 40px; padding-top: 0; padding-bottom: 0; }
-    .st-key-seed { margin-top: 0 !important; margin-bottom: 0 !important; }
+    /* Align Generate row (button + seed) to bottom of the row container.
+       We insert a marker .gen-row before the st.columns; the next stHorizontalBlock is the row. */
+    .gen-row + div[data-testid="stHorizontalBlock"] { align-items: flex-end; gap: 32px; }
+    /* Stack audio + download button vertically for consistent layout */
+    .dl-row + div[data-testid="stHorizontalBlock"] { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+    .dl-row + div[data-testid="stHorizontalBlock"] > div { width: 100% !important; }
+    .dl-row + div[data-testid="stHorizontalBlock"] .stButton button { width: 100%; }
+    /* Add horizontal padding to main two columns */
+    /* Use Streamlit columns(gap=...) for spacing; no extra CSS gap/padding needed here. */
+    /* Seed: keep row height equal to button; overlay label via ::before on the widget container */
+    .st-key-seed { position: relative; }
+    .st-key-seed::before { content: 'Seed'; position: absolute; top: -18px; left: 2px; font-weight: 600; font-size: 0.85rem; line-height: 1; opacity: 0.9; }
+    .st-key-seed [data-testid="stNumberInputContainer"] { height: 56px; }
+    .st-key-seed input[data-testid="stNumberInputField"] { height: 56px; padding-top: 0; padding-bottom: 0; }
+    .footer-note { font-size: 0.85rem; opacity: 0.75; margin: 0; }
+    /* Hide the tiny iframe container used for JS injection at footer */
+    .js-hook + div[data-testid="stElementContainer"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
+    .js-hook + div[data-testid="stElementContainer"] iframe { display: none !important; height: 0 !important; }
+    /* Robustly hide the injected iframe (match by srcdoc content) and its container */
+    iframe[data-testid="stIFrame"][srcdoc*="attachDragHighlight"] { display: none !important; height: 0 !important; visibility: hidden !important; }
+    div[data-testid="stElementContainer"] > iframe[data-testid="stIFrame"][srcdoc*="attachDragHighlight"] { display: none !important; height: 0 !important; }
+    /* Hide the wrapper itself if it contains that iframe (requires :has support, works in modern browsers) */
+    div[data-testid="stElementContainer"]:has(> iframe[data-testid="stIFrame"][srcdoc*="attachDragHighlight"]) {
+        display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -193,14 +215,14 @@ def build_prompt(
 
 
 st.title("AudioPrompt")
-top_left, top_right = st.columns([1, 1])
+top_left, top_right = st.columns([1, 1], gap="large")
 with top_left:
     st.subheader("Quick Start")
     st.markdown(
         """
         AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It can imprint a scale‑based melody, emphasize a frequency band (vocal/guitar/bass/custom), and prepend the prompt to your input audio.
 
-        1. Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only.
+        1. Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only (a simple 1–2 bar drum loop works great as a starting point).
         2. Set Prompt seconds and choose Melody settings (root/scale/BPM).
         3. Use Focus (or Custom band) and enable Tame Low End for cleaner results.
         4. Click Generate Prompt. Preview the Prompt, and if input audio is provided, the Combined result. Download the tagged WAVs.
@@ -230,7 +252,8 @@ with top_right:
 
 # Single divider spanning both columns to separate top row from main content
 st.divider()
-left, right = st.columns(2)
+st.markdown("<div class='main-cols'>", unsafe_allow_html=True)
+left, right = st.columns(2, gap="large")
 
 with left:
 
@@ -250,11 +273,25 @@ with left:
         )
     if enable_melody:
         roots = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
-        melody_root = st.selectbox("Root", roots, index=roots.index("E"), help="Root note for the scale (C4=60).")
         scales = sorted(list(SCALES.keys()))
-        melody_scale = st.selectbox("Scale", options=scales, index=scales.index("minor_pentatonic") if "minor_pentatonic" in scales else 0, help="Choose from major/modes, pentatonics, blues, etc.")
+        # Root and Scale side-by-side
+        msel1, msel2 = st.columns(2, gap="small")
+        with msel1:
+            melody_root = st.selectbox(
+                "Root",
+                roots,
+                index=roots.index("E"),
+                help="Root note for the scale (C4=60).",
+            )
+        with msel2:
+            melody_scale = st.selectbox(
+                "Scale",
+                options=scales,
+                index=scales.index("minor_pentatonic") if "minor_pentatonic" in scales else 0,
+                help="Choose from major/modes, pentatonics, blues, etc.",
+            )
 
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, gap="small")
         with col1:
             bpm = st.slider("BPM", 40, 220, 96, 1, help="Tempo driving randomized note durations.")
         with col2:
@@ -262,14 +299,14 @@ with left:
         vib_depth = st.slider("Vibrato depth", 0.0, 0.05, 0.02, 0.001, help="Depth of pitch modulation (fraction).")
 
         with st.expander("Melody – Advanced", expanded=False):
-            colA1, colA2 = st.columns(2)
+            colA1, colA2 = st.columns(2, gap="small")
             with colA1:
                 low_midi = st.slider("Low MIDI", 24, 84, 55, 1, help="Register floor (C4=60).")
-                step_bias = st.slider("Step bias", 0.0, 1.0, 0.8, 0.01, help="Probability of moving to a neighboring scale degree.")
+                step_bias = st.slider("Step bias", 0.0, 1.0, 0.5, 0.01, help="Probability of moving to a neighboring scale degree.")
                 glide_prob = st.slider("Glide prob", 0.0, 1.0, 0.25, 0.01, help="Probability of sliding into the next note.")
             with colA2:
                 high_midi = st.slider("High MIDI", 36, 96, 79, 1, help="Register ceiling. Keep Low < High.")
-                leap_steps = st.slider("Max leap (scale steps)", 1, 8, 4, 1, help="Largest jump when not stepping.")
+                leap_steps = st.slider("Max leap (scale steps)", 1, 8, 7, 1, help="Largest jump when not stepping.")
                 glide_frac = st.slider("Glide frac", 0.0, 0.9, 0.35, 0.01, help="Portion of the note duration spent gliding.")
             rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.12, 0.01, help="Chance of rests vs notes.")
     else:
@@ -278,7 +315,7 @@ with left:
         melody_scale = "minor_blues"
         bpm = 96
         low_midi, high_midi = 55, 79
-        step_bias, leap_steps, rest_prob = 0.8, 4, 0.12
+        step_bias, leap_steps, rest_prob = 0.5, 7, 0.12
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
 
@@ -404,11 +441,11 @@ with right:
     # Render Generate & Outputs at the top of the right column
     with gen_top:
         st.subheader("Generate & Outputs")
-        btn_col, seed_col = st.columns([3,1])
+        st.markdown("<div class='gen-row'>", unsafe_allow_html=True)
+        btn_col, seed_col = st.columns([3,1], gap="medium")
         with btn_col:
-            pressed = st.button("Generate Prompt", type="primary", use_container_width=True)
+            pressed = st.button("Generate Prompt", type="primary", width="stretch")
         with seed_col:
-            st.markdown("<div class='seed-label'>Seed</div>", unsafe_allow_html=True)
             seed = st.number_input(
                 "Seed",
                 min_value=-1,
@@ -419,6 +456,7 @@ with right:
                 help="Controls randomness for pink noise and the melody (notes, glides, etc.). Set to -1 to use a new random seed each generation.",
                 key="seed",
             )
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # Output & Seed just beneath Generate (no separate heading to reduce clutter)
         prompt_seconds = st.slider(
@@ -458,9 +496,9 @@ with right:
         with colo3:
             fade_out_ms = st.slider("Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end.")
 
-        # Auto-generate once on first load
-        auto_first = ("y_prompt" not in st.session_state)
-        if pressed or auto_first:
+        # Generate immediately after controls so results are available below in this same run
+        # Only generate when the button is pressed (no auto-generate on first load)
+        if pressed:
             with st.spinner("Generating prompt..."):
                 # Resolve seed: -1 means random each generation
                 seed_input = int(st.session_state.get("seed", 7))
@@ -481,59 +519,135 @@ with right:
                 st.session_state["seed_used"] = seed_to_use
                 st.session_state["prompt_sr"] = int(sr)
 
+        # Audio and download buttons directly under gain/fade sliders
+        if "y_prompt" in st.session_state:
+            # Build prompt WAV using stored prompt SR
+            y_prompt_local = st.session_state["y_prompt"]
+            sr_prompt_local = int(st.session_state.get("prompt_sr", int(sr)))
+
+            # File naming for prompt/combined
+            seed_val_local = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
+            base_stem_local = Path(uploaded.name).stem if uploaded is not None else "prompt"
+            suffix_local = tag_suffix(
+                enable_melody,
+                melody_scale,
+                enable_focus,
+                focus_params.get("preset"),
+                band if focus_params.get("preset") is None else None,
+                seed_val_local,
+                output_suffix,
+            )
+            prompt_only_name_local = f"{base_stem_local}_prompt_scale-{melody_scale if enable_melody else 'none'}_root-{melody_root}_focus-"
+            if enable_focus:
+                if focus_params.get("preset"):
+                    prompt_only_name_local += f"{focus_params['preset']}"
+                elif band:
+                    prompt_only_name_local += f"band-{int(band[0])}-{int(band[1])}"
+                else:
+                    prompt_only_name_local += "custom"
+            else:
+                prompt_only_name_local += "none"
+            prompt_only_name_local += f"_seed-{seed_val_local}.wav"
+
+            # Prompt audio + download
+            st.markdown("**Prompt**")
+            prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
+            st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
+            ap_col_audio, ap_col_btn = st.columns([4,1], gap="small")
+            with ap_col_audio:
+                st.audio(prompt_wav_local, format="audio/wav")
+            with ap_col_btn:
+                st.download_button(
+                    "Download Prompt",
+                    data=prompt_wav_local,
+                    file_name=prompt_only_name_local,
+                    mime="audio/wav",
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            # Combined audio + download (if input provided)
+            if uploaded is not None:
+                try:
+                    x_local, sr_in_local = load_audio_mono(uploaded, int(sr))
+                except Exception as e:
+                    st.error(f"Failed to read input audio. Prefer WAV/FLAC/OGG. Error: {e}")
+                    x_local = None
+                if x_local is not None:
+                    target_len_local = int(round(float(prompt_seconds) * int(sr)))
+                    prompt_local = y_prompt_local
+                    # Resample prompt if SR differs
+                    if sr_prompt_local != int(sr):
+                        g_local = np.gcd(sr_prompt_local, int(sr))
+                        prompt_local = resample_poly(prompt_local, int(sr) // g_local, sr_prompt_local // g_local).astype(np.float32)
+                    prompt_local = prompt_local[:target_len_local]
+                    # Auto/Manual gain
+                    if auto_gain:
+                        try:
+                            seed_rms_db_local = _rms_dbfs(x_local)
+                            prompt_rms_db_local = _rms_dbfs(prompt_local[:target_len_local]) if target_len_local > 0 else _rms_dbfs(prompt_local)
+                            desired_db_local = seed_rms_db_local + float(auto_gain_offset_db)
+                            gain_db_local = desired_db_local - prompt_rms_db_local
+                        except Exception:
+                            gain_db_local = float(prompt_gain_db)
+                    else:
+                        gain_db_local = float(prompt_gain_db)
+                    gain_local = 10 ** (gain_db_local / 20.0)
+                    prompt_local = apply_fades(prompt_local * gain_local, int(sr), int(fade_in_ms), int(fade_out_ms))
+                    combined_local = np.concatenate([prompt_local.astype(np.float32, copy=False), x_local.astype(np.float32, copy=False)], axis=0)
+                    peak_local = float(np.max(np.abs(combined_local)) + 1e-12)
+                    if peak_local > 0.999:
+                        combined_local = (combined_local / peak_local * 0.999).astype(np.float32)
+
+                    combined_wav_local = wav_bytes(combined_local, int(sr))
+                    st.markdown("**Combined**")
+                    st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
+                    cap_col_audio, cap_col_btn = st.columns([4,1], gap="small")
+                    with cap_col_audio:
+                        st.audio(combined_wav_local, format="audio/wav")
+                    with cap_col_btn:
+                        combined_name_local = f"{Path(uploaded.name).stem}{suffix_local}_root-{melody_root}.wav"
+                        st.download_button(
+                            "Download Combined",
+                            data=combined_wav_local,
+                            file_name=combined_name_local,
+                            mime="audio/wav",
+                        )
+                    st.markdown("</div>", unsafe_allow_html=True)
         if "y_prompt" not in st.session_state:
             st.info("Set your parameters and press Generate Prompt.")
-            st.stop()
-
-        y_prompt = st.session_state["y_prompt"]
-        events = st.session_state.get("events")
-
-        # Preview (spectrograms + players)
-        st.subheader("Preview")
-        seed_val = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
-        st.caption(f"Seed used: {seed_val}")
-        st.markdown("**Prompt**")
-        sr_prompt = int(st.session_state.get("prompt_sr", int(sr)))
-        # Spectrogram preview (Prompt)
-        try:
-            from scipy.signal import spectrogram as _spectrogram
-            fig_p, ax_p = plt.subplots(figsize=(6, 2.4))
-            f_p, t_p, Sxx_p = _spectrogram(y_prompt.astype(np.float32, copy=False), sr_prompt, nperseg=1024, noverlap=768)
-            Sxx_p_db = 10 * np.log10(Sxx_p + 1e-12)
-            pcm = ax_p.pcolormesh(t_p, f_p, Sxx_p_db, shading="auto", cmap="magma")
-            ax_p.set_ylabel("Hz")
-            ax_p.set_xlabel("s")
-            ax_p.set_title("Prompt – Spectrogram")
-            plt.colorbar(pcm, ax=ax_p, fraction=0.046, pad=0.02, label="dB")
-            st.pyplot(fig_p, use_container_width=True)
-            plt.close(fig_p)
-        except Exception:
-            pass
-        prompt_wav = wav_bytes(y_prompt, sr_prompt)
-        st.audio(prompt_wav, format="audio/wav")
-
-        # Tagged filenames
-        if uploaded is not None:
-            base_stem = Path(uploaded.name).stem
         else:
-            base_stem = "prompt"
-        suffix = tag_suffix(enable_melody, melody_scale, enable_focus, focus_params.get("preset"), band if focus_params.get("preset") is None else None, seed_val, output_suffix)
-        prompt_only_name = f"{base_stem}_prompt_scale-{melody_scale if enable_melody else 'none'}_root-{melody_root}_focus-"
-        if enable_focus:
-            if focus_params.get("preset"):
-                prompt_only_name += f"{focus_params['preset']}"
-            elif band:
-                prompt_only_name += f"band-{int(band[0])}-{int(band[1])}"
-            else:
-                prompt_only_name += "custom"
-        else:
-            prompt_only_name += "none"
-        prompt_only_name += f"_seed-{seed_val}.wav"
+            y_prompt = st.session_state["y_prompt"]
+            events = st.session_state.get("events")
 
-        st.download_button("Download tagged prompt", data=prompt_wav, file_name=prompt_only_name, mime="audio/wav")
+        # Spectrogram previews only (no audio or downloads)
+        # Show seed info above the spectrograms (after audio players)
+        if "y_prompt" in st.session_state:
+            seed_val = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
+            st.caption(f"Seed used: {seed_val}")
+        st.subheader("Spectrograms")
+        if "y_prompt" in st.session_state:
+            st.markdown("**Prompt**")
+            # Ensure local variables exist before use
+            y_prompt = st.session_state["y_prompt"]
+            sr_prompt = int(st.session_state.get("prompt_sr", int(sr)))
+            # Spectrogram preview (Prompt)
+            try:
+                from scipy.signal import spectrogram as _spectrogram
+                fig_p, ax_p = plt.subplots(figsize=(6, 2.4))
+                f_p, t_p, Sxx_p = _spectrogram(y_prompt.astype(np.float32, copy=False), sr_prompt, nperseg=1024, noverlap=768)
+                Sxx_p_db = 10 * np.log10(Sxx_p + 1e-12)
+                pcm = ax_p.pcolormesh(t_p, f_p, Sxx_p_db, shading="auto", cmap="magma")
+                ax_p.set_ylabel("Hz")
+                ax_p.set_xlabel("s")
+                ax_p.set_title("Prompt – Spectrogram")
+                plt.colorbar(pcm, ax=ax_p, fraction=0.046, pad=0.02, label="dB")
+                st.pyplot(fig_p, width="stretch")
+                plt.close(fig_p)
+            except Exception:
+                pass
 
-        # Combined output if file provided
-        if uploaded is not None:
+        # Combined output spectrogram if file provided
+        if uploaded is not None and "y_prompt" in st.session_state:
             try:
                 x, sr_in = load_audio_mono(uploaded, int(sr))
             except Exception as e:
@@ -566,7 +680,8 @@ with right:
                 if peak > 0.999:
                     combined = (combined / peak * 0.999).astype(np.float32)
 
-                # Spectrogram preview (Combined)
+                # Combined spectrogram label above the image, then plot
+                st.markdown("**Combined**")
                 try:
                     fig_c, ax_c = plt.subplots(figsize=(6, 2.4))
                     f_c, t_c, Sxx_c = _spectrogram(combined.astype(np.float32, copy=False), int(sr), nperseg=1024, noverlap=768)
@@ -576,17 +691,10 @@ with right:
                     ax_c.set_xlabel("s")
                     ax_c.set_title("Combined – Spectrogram")
                     plt.colorbar(pcm2, ax=ax_c, fraction=0.046, pad=0.02, label="dB")
-                    st.pyplot(fig_c, use_container_width=True)
+                    st.pyplot(fig_c, width="stretch")
                     plt.close(fig_c)
                 except Exception:
                     pass
-
-                combined_wav = wav_bytes(combined, int(sr))
-                st.markdown("**Combined**")
-                st.audio(combined_wav, format="audio/wav")
-
-                combined_name = f"{Path(uploaded.name).stem}{suffix}_root-{melody_root}.wav"
-                st.download_button("Download tagged combined", data=combined_wav, file_name=combined_name, mime="audio/wav")
             else:
                 st.info("Upload a WAV/FLAC/OGG file to create a combined output.")
         else:
@@ -594,9 +702,11 @@ with right:
 
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
-st.caption(
-    "Terms & Privacy: Upload only content you have rights to. By using this app you confirm you have permission to process any uploaded audio."
+st.markdown(
+    "<div class='footer-note'>Terms & Privacy: Upload only content you have rights to. By using this app you confirm you have permission to process any uploaded audio.</div>",
+    unsafe_allow_html=True,
 )
 
 # Inject drag-over highlight script at the end to avoid top spacer
+st.markdown("<div class='js-hook'></div>", unsafe_allow_html=True)
 components.html(_DRAG_JS, height=0)

@@ -15,8 +15,13 @@ def _as_readable(file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO, obje
         return str(file_or_bytes)
     if isinstance(file_or_bytes, (bytes, bytearray)):
         return BytesIO(file_or_bytes)
-    # Streamlit's UploadedFile has .read()/.seek()
+    # Streamlit's UploadedFile and other file-like objects: rewind before reading
     if hasattr(file_or_bytes, "read"):
+        try:
+            if hasattr(file_or_bytes, "seek"):
+                file_or_bytes.seek(0)
+        except Exception:
+            pass
         return file_or_bytes
     raise TypeError("Unsupported input type for audio loading.")
 

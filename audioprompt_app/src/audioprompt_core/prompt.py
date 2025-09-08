@@ -39,7 +39,8 @@ def imprint_melody_focus(
     n_fft: int = 2048,
 ) -> np.ndarray:
     hop = n_fft // 4
-    freqs, times, Z = stft(noise, fs=sr, nperseg=n_fft, noverlap=n_fft - hop, boundary=None)
+    # Use Hann window with default boundary handling to satisfy NOLA/overlap-add conditions
+    freqs, times, Z = stft(noise, fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)
     mag, ph = np.abs(Z), np.angle(Z)
 
     if focus is not None:
@@ -79,7 +80,8 @@ def imprint_melody_focus(
             mask = 1.0 + (gain * (mask / mask.max()))
             mag[:, i] *= mask
 
-    _, y = istft(mag * np.exp(1j * ph), fs=sr, nperseg=n_fft, noverlap=n_fft - hop, boundary=None)
+    # Inverse STFT with matching window and hop
+    _, y = istft(mag * np.exp(1j * ph), fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)
     y = y[: len(noise)]
     y /= np.max(np.abs(y) + 1e-12)
     return y.astype(np.float32)
@@ -156,4 +158,3 @@ def apply_mono_lows(y: np.ndarray, sr: int, cutoff_hz: float = 120.0, taps: int 
     out_left = (left_hi + mono_low).astype(np.float32)
     out_right = (right_hi + mono_low).astype(np.float32)
     return np.stack([out_left, out_right], axis=1)
-
