@@ -83,6 +83,15 @@ st.markdown(
     div[data-testid="stElementContainer"]:has(> iframe[data-testid="stIFrame"][srcdoc*="attachDragHighlight"]) {
         display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important;
     }
+    /* Section cards and equal-height columns */
+    .section-card { border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); border-radius: 12px; padding: 14px 16px 12px; margin-bottom: 18px; }
+    .section-card h3, .section-card h2, .section-card h4 { margin-top: 0; }
+    .section-divider { height: 1px; background: rgba(255,255,255,0.10); margin: 8px 0 16px; }
+    /* Stretch the two main columns to the same height */
+    .main-cols + div[data-testid="stHorizontalBlock"] { align-items: stretch; }
+    .main-cols + div[data-testid="stHorizontalBlock"] > div { display: flex; }
+    .main-cols + div[data-testid="stHorizontalBlock"] > div > div { display: flex; flex-direction: column; height: 100%; }
+    .col-wrap { display: flex; flex-direction: column; height: 100%; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -260,6 +269,8 @@ left, right = st.columns(2, gap="large")
 
 with left:
 
+    # Melody card
+    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
     st.subheader("Melody")
     mcol1, mcol2 = st.columns([1,1])
     with mcol1:
@@ -322,8 +333,10 @@ with left:
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
 
-    # Small vertical gap between Melody and Focus sections
-    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Focus card
+    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
     # Focus (left) — for future tabs, keep flat containers
     st.subheader("Focus")
     fcol1, fcol2 = st.columns([1,1])
@@ -397,6 +410,8 @@ with left:
         mono_lows=True,
         mono_cutoff_hz=120,
     )
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 with right:
     # Reserve a container at the top for Generate & Outputs so it's visually above
