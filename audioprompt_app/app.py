@@ -403,16 +403,18 @@ with right:
     # Render Generate & Outputs at the top of the right column
     with gen_top:
         st.subheader("Generate & Outputs")
-        btn_col, seed_col = st.columns([2,1])
+        btn_col, seed_col = st.columns([3,1])
         with btn_col:
             pressed = st.button("Generate Prompt", type="primary", use_container_width=True)
         with seed_col:
+            st.markdown("<div style='font-weight:600; margin-bottom:4px;'>Seed</div>", unsafe_allow_html=True)
             seed = st.number_input(
                 "Seed",
                 min_value=-1,
                 max_value=10_000_000,
                 value=-1,
                 step=1,
+                label_visibility="collapsed",
                 help="Controls randomness for pink noise and the melody (notes, glides, etc.). Set to -1 to use a new random seed each generation.",
                 key="seed",
             )
@@ -448,7 +450,7 @@ with right:
         events = st.session_state.get("events")
 
         # Preview (spectrograms + players)
-        st.markdown("**Preview**")
+        st.subheader("Preview")
         st.markdown("**Prompt**")
         sr_prompt = int(st.session_state.get("prompt_sr", int(sr)))
         # Spectrogram preview (Prompt)
