@@ -6,6 +6,11 @@ profile.json
 .DS_Store
 __pycache__/
 *.pyc
+.pyo
+# Ensure recursive ignore of caches/bytecode
+**/__pycache__/
+**/*.py[cod]
 .ipynb_checkpoints/
 notebook_outputs/
 .venv/
+audioprompt_workbook.ipynb

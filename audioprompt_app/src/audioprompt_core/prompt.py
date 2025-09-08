@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.signal import stft, istft
+from scipy.signal import stft, istft, firwin, filtfilt
 
 
 def pink_noise(n: int, sr: int, seed: int | None = None) -> np.ndarray:
@@ -39,7 +39,8 @@ def imprint_melody_focus(
     n_fft: int = 2048,
 ) -> np.ndarray:
     hop = n_fft // 4
-    freqs, times, Z = stft(noise, fs=sr, nperseg=n_fft, noverlap=n_fft - hop, boundary=None)
+    # Use Hann window with default boundary handling to satisfy NOLA/overlap-add conditions
+    freqs, times, Z = stft(noise, fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)
     mag, ph = np.abs(Z), np.angle(Z)
 
     if focus is not None:
@@ -79,7 +80,8 @@ def imprint_melody_focus(
             mask = 1.0 + (gain * (mask / mask.max()))
             mag[:, i] *= mask
 
-    _, y = istft(mag * np.exp(1j * ph), fs=sr, nperseg=n_fft, noverlap=n_fft - hop, boundary=None)
+    # Inverse STFT with matching window and hop
+    _, y = istft(mag * np.exp(1j * ph), fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)
     y = y[: len(noise)]
     y /= np.max(np.abs(y) + 1e-12)
     return y.astype(np.float32)
@@ -103,3 +105,56 @@ def rhythmic_gate_from_events(events, sr: int, n_samples: int, attack: float = 0
         env[s0:s1] = np.maximum(env[s0:s1], seg)
     return env
 
+
+# ---------------------- Low-end utilities (HPF / Mono lows) ---------------------- #
+
+def _design_hpf(sr: int, cutoff_hz: float, taps: int = 1025) -> np.ndarray:
+    """Design a linear-phase FIR high-pass filter using a Kaiser window.
+
+    taps should be odd for exact linear phase; use filtfilt for zero-phase application.
+    """
+    cutoff = max(5.0, min(cutoff_hz, sr / 2.5))  # basic sanity
+    taps = int(taps) if taps % 2 == 1 else int(taps + 1)
+    # Use Kaiser beta tuned for ~60 dB stopband
+    beta = 8.6
+    return firwin(taps, cutoff, fs=sr, window=("kaiser", beta), pass_zero=False)
+
+
+def apply_hpf(y: np.ndarray, sr: int, cutoff_hz: float = 25.0, taps: int = 1025) -> np.ndarray:
+    """Apply a zero-phase FIR high-pass to y.
+
+    Works for mono (1D) or multi-channel (2D with shape [n, ch]).
+    """
+    if cutoff_hz <= 0:
+        return y
+    b = _design_hpf(sr, cutoff_hz, taps)
+    if y.ndim == 1:
+        return filtfilt(b, [1.0], y).astype(np.float32)
+    # apply per-channel
+    out = np.zeros_like(y, dtype=np.float32)
+    for c in range(y.shape[1]):
+        out[:, c] = filtfilt(b, [1.0], y[:, c]).astype(np.float32)
+    return out
+
+
+def apply_mono_lows(y: np.ndarray, sr: int, cutoff_hz: float = 120.0, taps: int = 1025) -> np.ndarray:
+    """Sum low frequencies below cutoff to mono while keeping highs stereo.
+
+    If y is mono (1D), returns y unchanged.
+    """
+    if y.ndim == 1:
+        return y
+    cutoff = max(20.0, min(cutoff_hz, sr / 3.0))
+    taps = int(taps) if taps % 2 == 1 else int(taps + 1)
+    beta = 8.6
+    # Low-pass for lows
+    lp = firwin(taps, cutoff, fs=sr, window=("kaiser", beta), pass_zero=True)
+    left_lp = filtfilt(lp, [1.0], y[:, 0])
+    right_lp = filtfilt(lp, [1.0], y[:, 1]) if y.shape[1] > 1 else left_lp
+    mono_low = 0.5 * (left_lp + right_lp)
+    # High components = original - lowpass
+    left_hi = y[:, 0] - left_lp
+    right_hi = (y[:, 1] - right_lp) if y.shape[1] > 1 else left_hi
+    out_left = (left_hi + mono_low).astype(np.float32)
+    out_right = (right_hi + mono_low).astype(np.float32)
+    return np.stack([out_left, out_right], axis=1)
