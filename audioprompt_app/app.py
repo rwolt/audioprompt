@@ -170,7 +170,7 @@ with top_left:
         """
     )
 with top_right:
-    st.subheader("Input & Output")
+    st.subheader("Input Audio")
     uploaded = st.file_uploader(
         "Input audio (optional)",
         type=["wav", "flac", "ogg", "aiff", "aif"],
@@ -213,7 +213,7 @@ with left:
         roots = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
         melody_root = st.selectbox("Root", roots, index=roots.index("E"), help="Root note for the scale (C4=60).")
         scales = sorted(list(SCALES.keys()))
-        melody_scale = st.selectbox("Scale", options=scales, index=scales.index("minor_blues") if "minor_blues" in scales else 0, help="Choose from major/modes, pentatonics, blues, etc.")
+        melody_scale = st.selectbox("Scale", options=scales, index=scales.index("minor_pentatonic") if "minor_pentatonic" in scales else 0, help="Choose from major/modes, pentatonics, blues, etc.")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -331,48 +331,6 @@ with right:
     # Reserve a container at the top for Generate & Outputs so it's visually above
     gen_top = st.container()
 
-    # Small spacing between Focus and Output & Seed
-    st.markdown("<div style='height: 12px'></div>", unsafe_allow_html=True)
-    # Output & Seed
-    st.markdown("**Output & Seed**")
-    prompt_seconds = st.slider(
-        "Prompt seconds",
-        1.0,
-        12.0,
-        4.0,
-        0.5,
-        help="Length of the generated prompt (also used when prepending).",
-    )
-    # Prompt level group
-    st.markdown("**Prompt Level**")
-    ag_col1, ag_col2 = st.columns([1,1])
-    with ag_col1:
-        auto_gain = st.checkbox(
-            "Auto gain (match seed)",
-            value=False,
-            help="Detect seed loudness and set the prompt level automatically. Uses RMS in dBFS."
-        )
-    with ag_col2:
-        auto_gain_offset_db = st.slider(
-            "Prompt relative to seed (dB)",
-            -12.0, 6.0, -3.0, 0.5,
-            help="Target prompt loudness relative to seed RMS (e.g., −3 dB means the prompt is slightly quieter).",
-            disabled=not auto_gain,
-        )
-
-    # Manual gain (disabled when auto-gain is on)
-    colo1, colo2, colo3 = st.columns(3)
-    with colo1:
-        prompt_gain_db = st.slider(
-            "Prompt gain (dB)",
-            -24.0, 6.0, -3.0, 0.5,
-            help="Level for the prepended prompt.",
-            disabled=auto_gain,
-        )
-    with colo2:
-        fade_in_ms = st.slider("Fade-in (ms)", 0, 200, 10, 1, help="Smooth ramp at the start.")
-    with colo3:
-        fade_out_ms = st.slider("Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end.")
     # Seed control moved next to Generate button
     output_suffix = "_with_prompt"
     # Collect params for generation
@@ -422,6 +380,45 @@ with right:
                 key="seed",
             )
 
+        # Output & Seed just beneath Generate
+        st.subheader("Output & Seed")
+        prompt_seconds = st.slider(
+            "Prompt seconds",
+            1.0,
+            12.0,
+            4.0,
+            0.5,
+            help="Length of the generated prompt (also used when prepending).",
+        )
+        st.markdown("**Prompt Level**")
+        ag_col1, ag_col2 = st.columns([1,1])
+        with ag_col1:
+            auto_gain = st.checkbox(
+                "Auto gain (match input audio)",
+                value=False,
+                help="Detect input audio loudness and set the prompt level automatically (RMS in dBFS)."
+            )
+        with ag_col2:
+            auto_gain_offset_db = st.slider(
+                "Prompt relative to input (dB)",
+                -12.0, 6.0, -3.0, 0.5,
+                help="Target prompt loudness relative to input RMS (e.g., −3 dB makes the prompt slightly quieter).",
+                disabled=not auto_gain,
+            )
+        # Manual gain and fades
+        colo1, colo2, colo3 = st.columns(3)
+        with colo1:
+            prompt_gain_db = st.slider(
+                "Prompt gain (dB)",
+                -24.0, 6.0, -3.0, 0.5,
+                help="Level for the prepended prompt.",
+                disabled=auto_gain,
+            )
+        with colo2:
+            fade_in_ms = st.slider("Fade-in (ms)", 0, 200, 10, 1, help="Smooth ramp at the start.")
+        with colo3:
+            fade_out_ms = st.slider("Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end.")
+
         # Auto-generate once on first load
         auto_first = ("y_prompt" not in st.session_state)
         if pressed or auto_first:
@@ -454,6 +451,8 @@ with right:
 
         # Preview (spectrograms + players)
         st.subheader("Preview")
+        seed_val = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
+        st.caption(f"Seed used: {seed_val}")
         st.markdown("**Prompt**")
         sr_prompt = int(st.session_state.get("prompt_sr", int(sr)))
         # Spectrogram preview (Prompt)
@@ -479,9 +478,8 @@ with right:
             base_stem = Path(uploaded.name).stem
         else:
             base_stem = "prompt"
-        seed_val = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
         suffix = tag_suffix(enable_melody, melody_scale, enable_focus, focus_params.get("preset"), band if focus_params.get("preset") is None else None, seed_val, output_suffix)
-        prompt_only_name = f"{base_stem}_prompt_scale-{melody_scale if enable_melody else 'none'}_focus-"
+        prompt_only_name = f"{base_stem}_prompt_scale-{melody_scale if enable_melody else 'none'}_root-{melody_root}_focus-"
         if enable_focus:
             if focus_params.get("preset"):
                 prompt_only_name += f"{focus_params['preset']}"
@@ -493,7 +491,7 @@ with right:
             prompt_only_name += "none"
         prompt_only_name += f"_seed-{seed_val}.wav"
 
-        st.download_button("Download prompt", data=prompt_wav, file_name=prompt_only_name, mime="audio/wav")
+        st.download_button("Download tagged prompt", data=prompt_wav, file_name=prompt_only_name, mime="audio/wav")
 
         # Combined output if file provided
         if uploaded is not None:
@@ -548,8 +546,8 @@ with right:
                 st.markdown("**Combined**")
                 st.audio(combined_wav, format="audio/wav")
 
-                combined_name = f"{Path(uploaded.name).stem}{suffix}.wav"
-                st.download_button("Download combined", data=combined_wav, file_name=combined_name, mime="audio/wav")
+                combined_name = f"{Path(uploaded.name).stem}{suffix}_root-{melody_root}.wav"
+                st.download_button("Download tagged combined", data=combined_wav, file_name=combined_name, mime="audio/wav")
             else:
                 st.info("Upload a WAV/FLAC/OGG file to create a combined output.")
         else:
