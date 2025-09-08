@@ -239,17 +239,17 @@ with left:
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
 
-    # Output & Seed and Focus controls moved to the right column to balance layout
-
-with right:
-    # Reserve a container at the top for Generate & Outputs so it's visually above
-    gen_top = st.container()
-    # Focus with compact defaults and expandable advanced controls
+    # Focus (left) — for future tabs, keep flat containers
     st.markdown("**Focus**")
     enable_focus = st.checkbox(
         "Enable focus band",
         value=False,
         help="Emphasize energy in a vocal/guitar/bass band or a custom Hz range.",
+    )
+    tame_low_end = st.checkbox(
+        "Tame Low End",
+        value=True,
+        help="Reduce inaudible sub‑bass to free headroom and keep starts clean. Advanced controls in the expander.",
     )
     if enable_focus:
         focus_preset = st.radio(
@@ -261,14 +261,6 @@ with right:
         )
     else:
         focus_preset = "none"
-    # Simple low-end checkbox directly under presets (sane default on)
-    tame_low_end = st.checkbox(
-        "Tame Low End",
-        value=True,
-        help="Reduce inaudible sub‑bass to free headroom and keep starts clean. Advanced controls in the expander.",
-    )
-
-    # Advanced controls (auto‑expand for custom preset)
     with st.expander("Focus Band – Advanced Settings", expanded=(enable_focus and focus_preset == "custom")):
         if enable_focus and focus_preset == "custom":
             band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
@@ -286,9 +278,7 @@ with right:
             floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
         with colf5:
             sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Steepness of the band edges.")
-
         st.markdown("**Low‑End (advanced)**")
-        # Defaults for low‑end advanced section
         hpf_cutoff_hz = st.slider(
             "HPF cutoff (Hz)", 20, 40, 25, 1,
             help="Frequencies below this are rolled off with a linear‑phase FIR filter.",
@@ -308,6 +298,34 @@ with right:
             "Mono below (Hz)", 80, 180, 120, 5,
             help="Frequencies below this are summed to mono while highs remain unchanged.",
         )
+
+    # Build Focus/imprint/low‑end configs for generation
+    focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
+    imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
+    hpf_taps = 2049 if locals().get('steepness', 'Steep') == "Steep" else 513
+    lowend_cfg = dict(
+        tame_low_end=bool(tame_low_end),
+        hpf_cutoff_hz=int(locals().get('hpf_cutoff_hz', 25)),
+        hpf_taps=int(hpf_taps),
+        mono_lows=bool(locals().get('mono_lows', True)),
+        mono_cutoff_hz=int(locals().get('mono_cutoff_hz', 120)),
+    )
+
+    # Build Focus/imprint/low‑end configs for generation
+    focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
+    imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
+    hpf_taps = 2049 if locals().get('steepness', 'Steep') == "Steep" else 513
+    lowend_cfg = dict(
+        tame_low_end=bool(tame_low_end),
+        hpf_cutoff_hz=int(locals().get('hpf_cutoff_hz', 25)),
+        hpf_taps=int(hpf_taps),
+        mono_lows=bool(locals().get('mono_lows', True)),
+        mono_cutoff_hz=int(locals().get('mono_cutoff_hz', 120)),
+    )
+
+with right:
+    # Reserve a container at the top for Generate & Outputs so it's visually above
+    gen_top = st.container()
 
     # Small spacing between Focus and Output & Seed
     st.markdown("<div style='height: 12px'></div>", unsafe_allow_html=True)
