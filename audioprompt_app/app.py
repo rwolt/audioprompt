@@ -189,39 +189,48 @@ with left:
     prompt_seconds = st.slider("Prompt seconds", 1.0, 12.0, 4.0, 0.5, help="Length of the generated prompt (also used when prepending).")
 
     st.divider()
-    st.subheader("Low‑End")
-    colLE1, colLE2 = st.columns(2)
-    with colLE1:
-        tame_low_end = st.checkbox(
-            "Tame low end (HPF)",
-            value=False,
-            help="High‑pass the prompt below ~20–40 Hz to remove inaudible rumble and free headroom. Keeps the pink tilt above the cutoff.",
-        )
-        hpf_cutoff_hz = st.slider(
-            "HPF cutoff (Hz)", 20, 40, 25, 1,
-            help="Frequencies below this are rolled off with a steep linear‑phase filter.",
-        )
-    with colLE2:
-        steepness = st.select_slider(
-            "Steepness",
-            options=["Normal", "Steep"],
-            value="Steep",
-            help="Filter length: Normal (~512 taps) or Steep (~2048 taps). Steeper = cleaner cutoff (more CPU).",
-        )
-        mono_lows = st.checkbox(
-            "Mono low frequencies",
-            value=False,
-            help="Sum bass to mono (e.g., <120 Hz) to keep low end tight. Mainly useful for stereo prompts.",
-        )
-        mono_cutoff_hz = st.slider(
-            "Mono below (Hz)", 80, 180, 120, 5,
-            help="Frequencies below this are summed to mono while highs remain unchanged.",
-        )
+    with st.expander("Low‑End (advanced)", expanded=False):
+        # Two simple toggles side‑by‑side to reduce clutter
+        tcol1, tcol2 = st.columns(2)
+        with tcol1:
+            tame_low_end = st.checkbox(
+                "Tame low end (HPF)",
+                value=False,
+                help="High‑pass below ~20–40 Hz to remove inaudible rumble and free headroom. Keeps the pink tilt above the cutoff.",
+            )
+        with tcol2:
+            mono_lows = st.checkbox(
+                "Mono low frequencies",
+                value=False,
+                help="Sum bass to mono (e.g., <120 Hz) to keep low end tight. Mostly relevant for stereo prompts.",
+            )
+
+        # Show detailed controls only when enabled
+        hpf_cutoff_hz, steepness = 25, "Steep"
+        mono_cutoff_hz = 120
+        if tame_low_end:
+            st.markdown("**High‑pass settings**")
+            hpf_cutoff_hz = st.slider(
+                "HPF cutoff (Hz)", 20, 40, 25, 1,
+                help="Frequencies below this are rolled off with a linear‑phase FIR filter.",
+            )
+            steepness = st.select_slider(
+                "Steepness",
+                options=["Normal", "Steep"],
+                value="Steep",
+                help="Filter length: Normal (~512 taps) or Steep (~2048 taps). Steeper = cleaner cutoff (more CPU).",
+            )
+        if mono_lows:
+            st.markdown("**Mono‑lows settings**")
+            mono_cutoff_hz = st.slider(
+                "Mono below (Hz)", 80, 180, 120, 5,
+                help="Frequencies below this are summed to mono while highs remain unchanged.",
+            )
 
     st.divider()
     st.subheader("Melody (when enabled)")
     roots = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
-    melody_root = st.selectbox("Root", roots, index=roots.index("A"), help="Root note for the scale (C4=60).")
+    melody_root = st.selectbox("Root", roots, index=roots.index("E"), help="Root note for the scale (C4=60).")
     scales = sorted(list(SCALES.keys()))
     melody_scale = st.selectbox("Scale", options=scales, index=scales.index("minor_blues") if "minor_blues" in scales else 0, help="Choose from major/modes, pentatonics, blues, etc.")
 
