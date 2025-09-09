@@ -280,6 +280,8 @@ with top_right:
 
 # Single divider spanning both columns to separate top row from main content
 st.divider()
+
+# Begin main columns
 st.markdown("<div class='main-cols'>", unsafe_allow_html=True)
 left, right = st.columns(2, gap="large")
 
@@ -573,32 +575,29 @@ with right:
                 prompt_only_name_local += "none"
             prompt_only_name_local += f"_seed-{seed_val_local}.wav"
 
-            # Prompt audio + download (render into fixed panel)
-            with out_left_slot.container():
-                st.markdown("<div class='output-panel'>", unsafe_allow_html=True)
-                st.markdown("**Prompt**")
-                st.caption(f"Seed used: {seed_val_local}")
-                prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
-                _log_debug(f"[prompt] wav_bytes={len(prompt_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
-                st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
-                ap_col_audio, ap_col_btn = st.columns([4,1], gap="small")
-                with ap_col_audio:
-                    st.audio(prompt_wav_local, format="audio/wav")
-                with ap_col_btn:
-                    st.download_button(
-                        "Download Prompt",
-                        data=prompt_wav_local,
-                        file_name=prompt_only_name_local,
-                        mime="audio/wav",
-                    )
-                st.markdown("</div>", unsafe_allow_html=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-                try:
-                    del prompt_wav_local
-                except Exception:
-                    pass
-                gc.collect()
-                _log_debug(f"[prompt] cleared locals; mem={_mem_usage_mb()} MB")
+            # Prompt audio + download (render below in this column)
+            st.markdown("**Prompt**")
+            st.caption(f"Seed used: {seed_val_local}")
+            prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
+            _log_debug(f"[prompt] wav_bytes={len(prompt_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
+            st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
+            ap_col_audio, ap_col_btn = st.columns([4,1], gap="small")
+            with ap_col_audio:
+                st.audio(prompt_wav_local, format="audio/wav")
+            with ap_col_btn:
+                st.download_button(
+                    "Download Prompt",
+                    data=prompt_wav_local,
+                    file_name=prompt_only_name_local,
+                    mime="audio/wav",
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
+            try:
+                del prompt_wav_local
+            except Exception:
+                pass
+            gc.collect()
+            _log_debug(f"[prompt] cleared locals; mem={_mem_usage_mb()} MB")
 
             # Combined audio + download (if input provided)
             if uploaded is not None:
@@ -639,23 +638,20 @@ with right:
 
                     combined_wav_local = wav_bytes(combined_local, int(sr))
                     _log_debug(f"[combined] samples={len(combined_local)}; wav_bytes={len(combined_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
-                    with out_right_slot.container():
-                        st.markdown("<div class='output-panel'>", unsafe_allow_html=True)
-                        st.markdown("**Combined**")
-                        st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
-                        cap_col_audio, cap_col_btn = st.columns([4,1], gap="small")
-                        with cap_col_audio:
-                            st.audio(combined_wav_local, format="audio/wav")
-                        with cap_col_btn:
-                            combined_name_local = f"{Path(uploaded.name).stem}{suffix_local}_root-{melody_root}.wav"
-                            st.download_button(
-                                "Download Combined",
-                                data=combined_wav_local,
-                                file_name=combined_name_local,
-                                mime="audio/wav",
-                            )
-                        st.markdown("</div>", unsafe_allow_html=True)
-                        st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown("**Combined**")
+                    st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
+                    cap_col_audio, cap_col_btn = st.columns([4,1], gap="small")
+                    with cap_col_audio:
+                        st.audio(combined_wav_local, format="audio/wav")
+                    with cap_col_btn:
+                        combined_name_local = f"{Path(uploaded.name).stem}{suffix_local}_root-{melody_root}.wav"
+                        st.download_button(
+                            "Download Combined",
+                            data=combined_wav_local,
+                            file_name=combined_name_local,
+                            mime="audio/wav",
+                        )
+                    st.markdown("</div>", unsafe_allow_html=True)
                     try:
                         del combined_wav_local
                         del combined_local
@@ -665,26 +661,12 @@ with right:
                         pass
                     gc.collect()
                     _log_debug(f"[combined] cleared locals; mem={_mem_usage_mb()} MB")
+        # Blue placeholders when outputs are not ready
         if "y_prompt" not in st.session_state:
-            st.info("Set your parameters and press Generate Prompt.")
-        else:
-            y_prompt = st.session_state["y_prompt"]
-            events = st.session_state.get("events")
-        # Remove spectrograms section from UI; keep combined info message behavior
-        if uploaded is not None and "y_prompt" in st.session_state:
-            try:
-                x, sr_in = load_audio_mono(uploaded, int(sr))
-            except Exception as e:
-                st.error(
-                    "Failed to read input audio. Prefer WAV/FLAC/OGG. "
-                    "MP3 support depends on your libsndfile build.\n"
-                    f"Error: {e}"
-                )
-                x = None
-            if x is None:
-                st.info("Upload a WAV/FLAC/OGG file to create a combined output.")
+            st.markdown("<div class='output-panel'><div class='output-placeholder'>Set your parameters and press Generate Prompt.</div></div>", unsafe_allow_html=True)
+            st.markdown("<div class='output-panel'><div class='output-placeholder'>No input file uploaded; only the prompt is generated.</div></div>", unsafe_allow_html=True)
         elif uploaded is None:
-            st.info("No input file uploaded; only the prompt is generated.")
+            st.markdown("<div class='output-panel'><div class='output-placeholder'>No input file uploaded; only the prompt is generated.</div></div>", unsafe_allow_html=True)
 
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
