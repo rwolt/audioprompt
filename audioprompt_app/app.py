@@ -52,8 +52,11 @@ def _mem_usage_mb() -> float | None:
             return None
 
 def _log_debug(msg: str):
-    if st.session_state.get("debug_logs", False):
-        st.text(msg)
+    """Log diagnostics to server logs (stdout). Keeps UI clean.
+
+    On Streamlit Community Cloud, these appear under app logs. Locally,
+    they print to the terminal running `streamlit run`.
+    """
     try:
         print(msg, flush=True)
     except Exception:
@@ -107,6 +110,16 @@ st.markdown(
     /* Hide the wrapper itself if it contains that iframe (requires :has support, works in modern browsers) */
     div[data-testid="stElementContainer"]:has(> iframe[data-testid="stIFrame"][srcdoc*="attachDragHighlight"]) {
         display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important;
+    }
+    /* Attractive pill-styled placeholder blocks (blue) */
+    .spec-placeholder {
+        width: 100%;
+        background: #16384b;
+        border-radius: 14px;
+        padding: 14px 18px;
+        color: rgba(255,255,255,0.95);
+        font-weight: 400;
+        margin: 10px 0 14px 0;
     }
     </style>
     """,
@@ -426,7 +439,7 @@ with left:
     )
 
 with right:
-    # Reserve a container at the top for Generate & Outputs so it's visually above
+    # Reserve a container at the top for Generate so it's visually above
     gen_top = st.container()
 
     # Seed control moved next to Generate button
@@ -460,9 +473,9 @@ with right:
         mono_cutoff_hz=120,
     )
 
-    # Render Generate & Outputs at the top of the right column
+    # Render Generate controls at the top of the right column
     with gen_top:
-        st.subheader("Generate & Outputs")
+        st.subheader("Generate")
         st.markdown("<div class='gen-row'>", unsafe_allow_html=True)
         btn_col, seed_col = st.columns([3,1], gap="medium")
         with btn_col:
@@ -479,8 +492,8 @@ with right:
                 key="seed",
             )
         st.markdown("</div>", unsafe_allow_html=True)
-        with st.expander("Debug", expanded=False):
-            st.checkbox("Enable debug logs", key="debug_logs")
+        # Debug logs are always sent to server stdout via _log_debug();
+        # no UI toggle needed to keep the interface clean.
 
         # Output & Seed just beneath Generate (no separate heading to reduce clutter)
         prompt_seconds = st.slider(
@@ -520,12 +533,7 @@ with right:
         with colo3:
             fade_out_ms = st.slider("Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end.")
 
-        # Option to reduce memory by hiding the Combined in-page audio preview
-        show_combined_preview = st.checkbox(
-            "Show Combined preview",
-            value=True,
-            help="If off, only the Combined download link is shown (reduces memory).",
-        )
+        # (Outputs header and preview toggle appear below, just before outputs)
 
         # Generate immediately after controls so results are available below in this same run
         # Only generate when the button is pressed (no auto-generate on first load)
@@ -552,7 +560,18 @@ with right:
                 st.session_state["prompt_sr"] = int(sr)
                 _log_debug(f"[gen] prompt_len={len(y_prompt)} samples @ {int(sr)} Hz; mem_after={_mem_usage_mb()} MB")
 
-        # Audio and download buttons directly under gain/fade sliders
+        # Outputs header + preview toggle inline
+        oh_col, oc_col = st.columns([4,2], gap="small")
+        with oh_col:
+            st.subheader("Outputs")
+        with oc_col:
+            show_combined_preview = st.checkbox(
+                "Show Combined preview",
+                value=True,
+                help="If off, only the Combined download link is shown (reduces memory).",
+            )
+
+        # Audio and download buttons directly under Outputs
         if "y_prompt" in st.session_state:
             # Build prompt WAV using stored prompt SR
             y_prompt_local = st.session_state["y_prompt"]
@@ -666,12 +685,12 @@ with right:
                         pass
                     gc.collect()
                     _log_debug(f"[combined] cleared locals; mem={_mem_usage_mb()} MB")
-        # Blue placeholders when outputs are not ready
+        # Blue placeholders when outputs are not ready (pill style)
         if "y_prompt" not in st.session_state:
-            st.markdown("<div class='output-panel'><div class='output-placeholder'>Set your parameters and press Generate Prompt.</div></div>", unsafe_allow_html=True)
-            st.markdown("<div class='output-panel'><div class='output-placeholder'>No input file uploaded; only the prompt is generated.</div></div>", unsafe_allow_html=True)
+            st.markdown("<div class='spec-placeholder'>Set your parameters and press Generate Prompt.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='spec-placeholder'>No input file uploaded; only the prompt is generated.</div>", unsafe_allow_html=True)
         elif uploaded is None:
-            st.markdown("<div class='output-panel'><div class='output-placeholder'>No input file uploaded; only the prompt is generated.</div></div>", unsafe_allow_html=True)
+            st.markdown("<div class='spec-placeholder'>No input file uploaded; only the prompt is generated.</div>", unsafe_allow_html=True)
 
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
