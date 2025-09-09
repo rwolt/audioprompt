@@ -1,9 +1,18 @@
-[theme]
-# Coral-ish primary color; Streamlit uses this for primary buttons
-primaryColor = "#FF6B6B"
-base = "dark"
+[logger]
+# Verbosity for Streamlit internals and your print/log output
+level = "debug"
+messageFormat = "%(asctime)s %(levelname)s %(message)s"
 
-# Leave other colors to defaults to avoid clutter; adjust later if needed
-# backgroundColor = ""
-# secondaryBackgroundColor = ""
-# textColor = ""
+[client]
+# Show full tracebacks in the browser to aid debugging
+showErrorDetails = "full"
+toolbarMode = "developer"
+
+[runner]
+# Keep reruns responsive during rapid UI changes
+fastReruns = true
+
+[server]
+# Default headless on cloud; harmless locally
+headless = true
+
