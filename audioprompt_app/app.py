@@ -1,5 +1,6 @@
 import os
 import sys
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -33,6 +34,30 @@ from audioprompt_core.melody import (
 
 
 st.set_page_config(page_title="AudioPrompt", layout="wide")
+
+# ------------------------------ Debug helpers ------------------------------ #
+def _mem_usage_mb() -> float | None:
+    try:
+        import psutil  # type: ignore
+        return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
+    except Exception:
+        try:
+            import resource  # type: ignore
+            rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            # Linux returns KB, macOS returns bytes
+            if sys.platform.startswith("darwin"):
+                return float(rss) / (1024 ** 2)
+            return float(rss) / 1024.0
+        except Exception:
+            return None
+
+def _log_debug(msg: str):
+    if st.session_state.get("debug_logs", False):
+        st.text(msg)
+    try:
+        print(msg, flush=True)
+    except Exception:
+        pass
 st.markdown(
     """
     <style>
@@ -83,15 +108,6 @@ st.markdown(
     div[data-testid="stElementContainer"]:has(> iframe[data-testid="stIFrame"][srcdoc*="attachDragHighlight"]) {
         display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important;
     }
-    /* Section cards and equal-height columns */
-    .section-card { border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); border-radius: 12px; padding: 14px 16px 12px; margin-bottom: 18px; }
-    .section-card h3, .section-card h2, .section-card h4 { margin-top: 0; }
-    .section-divider { height: 1px; background: rgba(255,255,255,0.10); margin: 8px 0 16px; }
-    /* Stretch the two main columns to the same height */
-    .main-cols + div[data-testid="stHorizontalBlock"] { align-items: stretch; }
-    .main-cols + div[data-testid="stHorizontalBlock"] > div { display: flex; }
-    .main-cols + div[data-testid="stHorizontalBlock"] > div > div { display: flex; flex-direction: column; height: 100%; }
-    .col-wrap { display: flex; flex-direction: column; height: 100%; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -269,8 +285,6 @@ left, right = st.columns(2, gap="large")
 
 with left:
 
-    # Melody card
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
     st.subheader("Melody")
     mcol1, mcol2 = st.columns([1,1])
     with mcol1:
@@ -333,10 +347,8 @@ with left:
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Focus card
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+    # Small vertical gap between Melody and Focus sections
+    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
     # Focus (left) — for future tabs, keep flat containers
     st.subheader("Focus")
     fcol1, fcol2 = st.columns([1,1])
@@ -411,8 +423,6 @@ with left:
         mono_cutoff_hz=120,
     )
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
 with right:
     # Reserve a container at the top for Generate & Outputs so it's visually above
     gen_top = st.container()
@@ -467,6 +477,8 @@ with right:
                 key="seed",
             )
         st.markdown("</div>", unsafe_allow_html=True)
+        with st.expander("Debug", expanded=False):
+            st.checkbox("Enable debug logs", key="debug_logs")
 
         # Output & Seed just beneath Generate (no separate heading to reduce clutter)
         prompt_seconds = st.slider(
@@ -513,6 +525,7 @@ with right:
                 # Resolve seed: -1 means random each generation
                 seed_input = int(st.session_state.get("seed", 7))
                 seed_to_use = int(np.random.randint(0, 10_000_000)) if seed_input == -1 else seed_input
+                _log_debug(f"[gen] seed={seed_to_use}; mem_before={_mem_usage_mb()} MB")
                 y_prompt, events = build_prompt(
                     sr=int(sr),
                     prompt_seconds=float(prompt_seconds),
@@ -528,6 +541,7 @@ with right:
                 st.session_state["y_prompt"], st.session_state["events"] = y_prompt, events
                 st.session_state["seed_used"] = seed_to_use
                 st.session_state["prompt_sr"] = int(sr)
+                _log_debug(f"[gen] prompt_len={len(y_prompt)} samples @ {int(sr)} Hz; mem_after={_mem_usage_mb()} MB")
 
         # Audio and download buttons directly under gain/fade sliders
         if "y_prompt" in st.session_state:
@@ -559,22 +573,32 @@ with right:
                 prompt_only_name_local += "none"
             prompt_only_name_local += f"_seed-{seed_val_local}.wav"
 
-            # Prompt audio + download (seed shown above)
-            st.markdown("**Prompt**")
-            st.caption(f"Seed used: {seed_val_local}")
-            prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
-            st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
-            ap_col_audio, ap_col_btn = st.columns([4,1], gap="small")
-            with ap_col_audio:
-                st.audio(prompt_wav_local, format="audio/wav")
-            with ap_col_btn:
-                st.download_button(
-                    "Download Prompt",
-                    data=prompt_wav_local,
-                    file_name=prompt_only_name_local,
-                    mime="audio/wav",
-                )
-            st.markdown("</div>", unsafe_allow_html=True)
+            # Prompt audio + download (render into fixed panel)
+            with out_left_slot.container():
+                st.markdown("<div class='output-panel'>", unsafe_allow_html=True)
+                st.markdown("**Prompt**")
+                st.caption(f"Seed used: {seed_val_local}")
+                prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
+                _log_debug(f"[prompt] wav_bytes={len(prompt_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
+                st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
+                ap_col_audio, ap_col_btn = st.columns([4,1], gap="small")
+                with ap_col_audio:
+                    st.audio(prompt_wav_local, format="audio/wav")
+                with ap_col_btn:
+                    st.download_button(
+                        "Download Prompt",
+                        data=prompt_wav_local,
+                        file_name=prompt_only_name_local,
+                        mime="audio/wav",
+                    )
+                st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+                try:
+                    del prompt_wav_local
+                except Exception:
+                    pass
+                gc.collect()
+                _log_debug(f"[prompt] cleared locals; mem={_mem_usage_mb()} MB")
 
             # Combined audio + download (if input provided)
             if uploaded is not None:
@@ -614,20 +638,33 @@ with right:
                         combined_local = (combined_local / peak_local * 0.999).astype(np.float32)
 
                     combined_wav_local = wav_bytes(combined_local, int(sr))
-                    st.markdown("**Combined**")
-                    st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
-                    cap_col_audio, cap_col_btn = st.columns([4,1], gap="small")
-                    with cap_col_audio:
-                        st.audio(combined_wav_local, format="audio/wav")
-                    with cap_col_btn:
-                        combined_name_local = f"{Path(uploaded.name).stem}{suffix_local}_root-{melody_root}.wav"
-                        st.download_button(
-                            "Download Combined",
-                            data=combined_wav_local,
-                            file_name=combined_name_local,
-                            mime="audio/wav",
-                        )
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    _log_debug(f"[combined] samples={len(combined_local)}; wav_bytes={len(combined_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
+                    with out_right_slot.container():
+                        st.markdown("<div class='output-panel'>", unsafe_allow_html=True)
+                        st.markdown("**Combined**")
+                        st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
+                        cap_col_audio, cap_col_btn = st.columns([4,1], gap="small")
+                        with cap_col_audio:
+                            st.audio(combined_wav_local, format="audio/wav")
+                        with cap_col_btn:
+                            combined_name_local = f"{Path(uploaded.name).stem}{suffix_local}_root-{melody_root}.wav"
+                            st.download_button(
+                                "Download Combined",
+                                data=combined_wav_local,
+                                file_name=combined_name_local,
+                                mime="audio/wav",
+                            )
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    try:
+                        del combined_wav_local
+                        del combined_local
+                        del prompt_local
+                        del x_local
+                    except Exception:
+                        pass
+                    gc.collect()
+                    _log_debug(f"[combined] cleared locals; mem={_mem_usage_mb()} MB")
         if "y_prompt" not in st.session_state:
             st.info("Set your parameters and press Generate Prompt.")
         else:
