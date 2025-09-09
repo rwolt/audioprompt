@@ -37,19 +37,38 @@ st.set_page_config(page_title="AudioPrompt", layout="wide")
 
 # ------------------------------ Debug helpers ------------------------------ #
 def _mem_usage_mb() -> float | None:
+    """Best-effort current RSS in MB.
+
+    Prefers psutil. On Linux without psutil, reads /proc/self/status (VmRSS).
+    Falls back to resource.getrusage only as a last resort (note: that's peak).
+    """
+    # psutil preferred (current RSS)
     try:
         import psutil  # type: ignore
         return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
     except Exception:
-        try:
-            import resource  # type: ignore
-            rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-            # Linux returns KB, macOS returns bytes
-            if sys.platform.startswith("darwin"):
-                return float(rss) / (1024 ** 2)
-            return float(rss) / 1024.0
-        except Exception:
-            return None
+        pass
+    # Linux /proc fallback
+    try:
+        if sys.platform.startswith("linux") and os.path.exists("/proc/self/status"):
+            with open("/proc/self/status", "r") as f:
+                for line in f:
+                    if line.startswith("VmRSS:"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            kb = float(parts[1])  # value in kB
+                            return kb / 1024.0
+    except Exception:
+        pass
+    # Last resort: peak (not current)
+    try:
+        import resource  # type: ignore
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        if sys.platform.startswith("darwin"):
+            return float(rss) / (1024 ** 2)  # bytes -> MB
+        return float(rss) / 1024.0  # kB -> MB
+    except Exception:
+        return None
 
 def _log_debug(msg: str):
     """Log diagnostics to server logs (stdout). Keeps UI clean.
@@ -61,6 +80,30 @@ def _log_debug(msg: str):
         print(msg, flush=True)
     except Exception:
         pass
+
+
+def _clear_outputs():
+    """Drop cached output bytes and related keys to free memory."""
+    for k in (
+        "prompt_bytes",
+        "prompt_key",
+        "combined_bytes",
+        "combined_key",
+        "combined_name",
+    ):
+        try:
+            st.session_state.pop(k, None)
+        except Exception:
+            pass
+    gc.collect()
+    _log_debug(f"[clear] outputs cleared; mem={_mem_usage_mb()} MB")
+
+
+def _upload_signature(uploaded_file):
+    """Return a simple signature for the uploaded file to detect changes."""
+    if uploaded_file is None:
+        return None
+    return (getattr(uploaded_file, "name", None), getattr(uploaded_file, "size", None))
 st.markdown(
     """
     <style>
@@ -89,10 +132,10 @@ st.markdown(
     /* Align Generate row (button + seed) to bottom of the row container.
        We insert a marker .gen-row before the st.columns; the next stHorizontalBlock is the row. */
     .gen-row + div[data-testid="stHorizontalBlock"] { align-items: flex-end; gap: 32px; }
-    /* Stack audio + download button vertically for consistent layout */
-    .dl-row + div[data-testid="stHorizontalBlock"] { flex-direction: column; align-items: stretch; gap: 0.5rem; }
-    .dl-row + div[data-testid="stHorizontalBlock"] > div { width: 100% !important; }
-    .dl-row + div[data-testid="stHorizontalBlock"] .stButton button { width: 100%; }
+    /* Inline audio + download with top alignment */
+    .dl-row + div[data-testid="stHorizontalBlock"] { align-items: flex-start; gap: 0.75rem; }
+    .dl-row + div[data-testid="stHorizontalBlock"] > div { width: auto; }
+    .dl-row + div[data-testid="stHorizontalBlock"] .stButton button { width: auto; }
     /* Add horizontal padding to main two columns */
     /* Use Streamlit columns(gap=...) for spacing; no extra CSS gap/padding needed here. */
     /* Seed: keep row height equal to button; overlay label via ::before on the widget container */
@@ -119,7 +162,7 @@ st.markdown(
         padding: 14px 18px;
         color: rgba(255,255,255,0.95);
         font-weight: 400;
-        margin: 10px 0 14px 0;
+        margin: 0 0 14px 0;
     }
     </style>
     """,
@@ -278,6 +321,7 @@ with top_right:
             "Drag & drop a file. If provided, the prompt will be prepended to create a combined output. "
             "MP3 support depends on your libsndfile build."
         ),
+        key="uploaded_file",
     )
     sr = st.number_input(
         "Sample rate (Hz)",
@@ -287,6 +331,18 @@ with top_right:
         step=1000,
         help="Processing rate; inputs are resampled. Higher SR costs more CPU.",
     )
+
+    # Auto-clear outputs if the uploaded file changes (or is cleared)
+    try:
+        prev_sig = st.session_state.get("_prev_upload_sig", "__unset__")
+        curr_sig = _upload_signature(st.session_state.get("uploaded_file"))
+        if prev_sig != curr_sig:
+            if prev_sig != "__unset__":
+                _clear_outputs()
+                _log_debug("[upload] input changed; outputs cleared")
+            st.session_state["_prev_upload_sig"] = curr_sig
+    except Exception:
+        pass
 
     # Toggles moved next to relevant sections below
     # Prompt seconds moved to Output & Seed section for better workflow alignment
@@ -362,8 +418,8 @@ with left:
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
 
-    # Small vertical gap between Melody and Focus sections
-    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+    # Add ~36px top margin before Focus header for clearer separation
+    st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
     # Focus (left) — for future tabs, keep flat containers
     st.subheader("Focus")
     fcol1, fcol2 = st.columns([1,1])
@@ -539,6 +595,8 @@ with right:
         # Only generate when the button is pressed (no auto-generate on first load)
         if pressed:
             with st.spinner("Generating prompt..."):
+                # Clear old outputs first to reduce memory before regenerating
+                _clear_outputs()
                 # Resolve seed: -1 means random each generation
                 seed_input = int(st.session_state.get("seed", 7))
                 seed_to_use = int(np.random.randint(0, 10_000_000)) if seed_input == -1 else seed_input
@@ -560,16 +618,8 @@ with right:
                 st.session_state["prompt_sr"] = int(sr)
                 _log_debug(f"[gen] prompt_len={len(y_prompt)} samples @ {int(sr)} Hz; mem_after={_mem_usage_mb()} MB")
 
-        # Outputs header + preview toggle inline
-        oh_col, oc_col = st.columns([4,2], gap="small")
-        with oh_col:
-            st.subheader("Outputs")
-        with oc_col:
-            show_combined_preview = st.checkbox(
-                "Show Combined preview",
-                value=True,
-                help="If off, only the Combined download link is shown (reduces memory).",
-            )
+        # Outputs header
+        st.subheader("Outputs")
 
         # Audio and download buttons directly under Outputs
         if "y_prompt" in st.session_state:
@@ -602,10 +652,18 @@ with right:
             prompt_only_name_local += f"_seed-{seed_val_local}.wav"
 
             # Prompt audio + download (render below in this column)
-            st.markdown("**Prompt**")
+            # Reuse cached prompt bytes if parameters unchanged
             st.caption(f"Seed used: {seed_val_local}")
-            prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
-            _log_debug(f"[prompt] wav_bytes={len(prompt_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
+            st.markdown("**Prompt**")
+            prompt_key_now = ("prompt", int(sr_prompt_local), int(seed_val_local))
+            if st.session_state.get("prompt_key") != prompt_key_now or "prompt_bytes" not in st.session_state:
+                prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
+                st.session_state["prompt_bytes"] = prompt_wav_local
+                st.session_state["prompt_key"] = prompt_key_now
+                _log_debug(f"[prompt] wav_bytes={len(prompt_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB (encoded)")
+            else:
+                prompt_wav_local = st.session_state["prompt_bytes"]
+                _log_debug(f"[prompt] reused cache; mem={_mem_usage_mb()} MB")
             st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
             ap_col_audio, ap_col_btn = st.columns([4,1], gap="small")
             with ap_col_audio:
@@ -618,12 +676,7 @@ with right:
                     mime="audio/wav",
                 )
             st.markdown("</div>", unsafe_allow_html=True)
-            try:
-                del prompt_wav_local
-            except Exception:
-                pass
-            gc.collect()
-            _log_debug(f"[prompt] cleared locals; mem={_mem_usage_mb()} MB")
+            # Keep cached bytes; no local deletes here
 
             # Combined audio + download (if input provided)
             if uploaded is not None:
@@ -658,16 +711,27 @@ with right:
                     gain_local = 10 ** (gain_db_local / 20.0)
                     prompt_local = apply_fades(prompt_local * gain_local, int(sr), int(fade_in_ms), int(fade_out_ms))
 
-                    # Build WAV without allocating a large concatenated array
-                    combined_wav_local = wav_bytes_concat_segments([prompt_local, x_local.astype(np.float32, copy=False)], int(sr))
-                    total_samples = int(prompt_local.shape[0] + x_local.shape[0])
-                    _log_debug(f"[combined] samples={total_samples}; wav_bytes={len(combined_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
+                    # Build or reuse Combined WAV without allocating a large concatenated array
+                    combined_key_now = (
+                        "combined",
+                        int(sr), float(prompt_seconds), int(seed_val_local),
+                        bool(auto_gain), float(auto_gain_offset_db) if auto_gain else float(prompt_gain_db),
+                        int(fade_in_ms), int(fade_out_ms),
+                        getattr(uploaded, "name", None), getattr(uploaded, "size", None),
+                    )
+                    if st.session_state.get("combined_key") != combined_key_now or "combined_bytes" not in st.session_state:
+                        combined_wav_local = wav_bytes_concat_segments([prompt_local, x_local.astype(np.float32, copy=False)], int(sr))
+                        st.session_state["combined_bytes"] = combined_wav_local
+                        st.session_state["combined_key"] = combined_key_now
+                        _log_debug(f"[combined] built; wav_bytes={len(combined_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
+                    else:
+                        combined_wav_local = st.session_state["combined_bytes"]
+                        _log_debug(f"[combined] reused cache; mem={_mem_usage_mb()} MB")
                     st.markdown("**Combined**")
                     st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
                     cap_col_audio, cap_col_btn = st.columns([4,1], gap="small")
                     with cap_col_audio:
-                        if show_combined_preview:
-                            st.audio(combined_wav_local, format="audio/wav")
+                        st.audio(combined_wav_local, format="audio/wav")
                     with cap_col_btn:
                         combined_name_local = f"{Path(uploaded.name).stem}{suffix_local}_root-{melody_root}.wav"
                         st.download_button(
@@ -678,13 +742,12 @@ with right:
                         )
                     st.markdown("</div>", unsafe_allow_html=True)
                     try:
-                        del combined_wav_local
                         del prompt_local
                         del x_local
                     except Exception:
                         pass
                     gc.collect()
-                    _log_debug(f"[combined] cleared locals; mem={_mem_usage_mb()} MB")
+                    _log_debug(f"[combined] locals cleared; mem={_mem_usage_mb()} MB")
         # Blue placeholders when outputs are not ready (pill style)
         if "y_prompt" not in st.session_state:
             st.markdown("<div class='spec-placeholder'>Set your parameters and press Generate Prompt.</div>", unsafe_allow_html=True)
