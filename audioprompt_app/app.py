@@ -18,7 +18,7 @@ def _rms_dbfs(y: np.ndarray) -> float:
 # Import core from ./src (ensure our local package takes precedence)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 # Import directly from submodules to avoid package-level side effects
-from audioprompt_core.audio import load_audio_mono, apply_fades, wav_bytes, tag_suffix
+from audioprompt_core.audio import load_audio_mono, apply_fades, wav_bytes, wav_bytes_concat_segments, tag_suffix
 from audioprompt_core.prompt import (
     pink_noise,
     imprint_melody_focus,
@@ -520,6 +520,13 @@ with right:
         with colo3:
             fade_out_ms = st.slider("Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end.")
 
+        # Option to reduce memory by hiding the Combined in-page audio preview
+        show_combined_preview = st.checkbox(
+            "Show Combined preview",
+            value=True,
+            help="If off, only the Combined download link is shown (reduces memory).",
+        )
+
         # Generate immediately after controls so results are available below in this same run
         # Only generate when the button is pressed (no auto-generate on first load)
         if pressed:
@@ -631,18 +638,17 @@ with right:
                         gain_db_local = float(prompt_gain_db)
                     gain_local = 10 ** (gain_db_local / 20.0)
                     prompt_local = apply_fades(prompt_local * gain_local, int(sr), int(fade_in_ms), int(fade_out_ms))
-                    combined_local = np.concatenate([prompt_local.astype(np.float32, copy=False), x_local.astype(np.float32, copy=False)], axis=0)
-                    peak_local = float(np.max(np.abs(combined_local)) + 1e-12)
-                    if peak_local > 0.999:
-                        combined_local = (combined_local / peak_local * 0.999).astype(np.float32)
 
-                    combined_wav_local = wav_bytes(combined_local, int(sr))
-                    _log_debug(f"[combined] samples={len(combined_local)}; wav_bytes={len(combined_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
+                    # Build WAV without allocating a large concatenated array
+                    combined_wav_local = wav_bytes_concat_segments([prompt_local, x_local.astype(np.float32, copy=False)], int(sr))
+                    total_samples = int(prompt_local.shape[0] + x_local.shape[0])
+                    _log_debug(f"[combined] samples={total_samples}; wav_bytes={len(combined_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
                     st.markdown("**Combined**")
                     st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
                     cap_col_audio, cap_col_btn = st.columns([4,1], gap="small")
                     with cap_col_audio:
-                        st.audio(combined_wav_local, format="audio/wav")
+                        if show_combined_preview:
+                            st.audio(combined_wav_local, format="audio/wav")
                     with cap_col_btn:
                         combined_name_local = f"{Path(uploaded.name).stem}{suffix_local}_root-{melody_root}.wav"
                         st.download_button(
@@ -654,7 +660,6 @@ with right:
                     st.markdown("</div>", unsafe_allow_html=True)
                     try:
                         del combined_wav_local
-                        del combined_local
                         del prompt_local
                         del x_local
                     except Exception:

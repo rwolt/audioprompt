@@ -85,6 +85,42 @@ def wav_bytes(y: np.ndarray, sr: int) -> bytes:
     return bio.getvalue()
 
 
+def wav_bytes_concat_segments(segments: list[np.ndarray], sr: int, peak_limit: float = 0.999) -> bytes:
+    """Write multiple mono segments back-to-back into a single WAV without
+    allocating a large concatenated array. Applies a single peak limiter
+    across all segments by a constant scale factor.
+
+    segments: list of 1D float arrays (any dtype) to be written sequentially.
+    sr: sample rate for the output WAV.
+    peak_limit: if overall peak exceeds this, scale all segments down so that
+                max amplitude equals peak_limit.
+    Returns WAV bytes (PCM16).
+    """
+    # Determine scale from overall peak across segments
+    overall_peak = 0.0
+    for s in segments:
+        if s is None:
+            continue
+        try:
+            p = float(np.max(np.abs(s)) + 1e-12)
+        except Exception:
+            p = 0.0
+        if p > overall_peak:
+            overall_peak = p
+    scale = 1.0
+    if overall_peak > peak_limit and overall_peak > 0.0:
+        scale = float(peak_limit / overall_peak)
+
+    bio = BytesIO()
+    # Open a streaming writer to avoid building full array in memory
+    with sf.SoundFile(bio, mode="w", samplerate=int(sr), channels=1, format="WAV", subtype="PCM_16") as f:
+        for s in segments:
+            if s is None:
+                continue
+            f.write((s.astype(np.float32, copy=False) * scale))
+    return bio.getvalue()
+
+
 def tag_suffix(enable_melody: bool, melody_scale: str, enable_focus: bool, focus_preset: Union[str, None], focus_band: Union[Tuple[int, int], None], seed: int, output_suffix: str) -> str:
     scale_tag = melody_scale if enable_melody else "none"
     if enable_focus:
