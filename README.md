@@ -2,6 +2,7 @@
 
 Create short, steerable “audio prompts” to nudge AI music tools. AudioPrompt can imprint a scale‑constrained melody onto pink noise, emphasize vocal/guitar/bass bands, and prepend the prompt to your track for upload.
 
+Demo: [https://audioprompt.streamlit.app/](https://audioprompt.streamlit.app/)
 ---
 
 ## ✨ Features
