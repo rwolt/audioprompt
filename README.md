@@ -7,6 +7,7 @@ Demo: [https://audioprompt.streamlit.app/](https://audioprompt.streamlit.app/)
 
 ## ✨ Features
 - 🧠 Scale‑driven melody imprint (randomized, in‑key, with vibrato/glides)
+- 🎛️ **Timbre controls** — change the texture of the imprinted melody with harmonic presets (dark, reece, metallic, etc.) and mask shapes
 - 🎚️ Spectral focus (vocal/guitar/bass presets or custom Hz band)
 - 🥁 Rhythmic gate from note events (phrase‑like envelope)
 - 📎 Drag‑and‑drop input; tagged downloads (scale/focus/seed)
@@ -128,13 +129,38 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
   - Step/leap behavior, rests, and seed‑driven randomness; converts notes to an f0 trajectory.
   - Expression: optional glides between notes and subtle vibrato; light smoothing to reduce discontinuities.
 - Spectral imprint:
-  - STFT on the pink noise; per frame, builds a harmonic mask centered at the current f0 (and harmonics) with Gaussian bandwidth proportional to frequency.
+  - STFT on the pink noise; per frame, builds a harmonic mask centered at the current f0 (and harmonics) with configurable bandwidth and shape.
+  - Timbre controls (optional): applies harmonic amplitude weighting and mask shape to change the texture (dark, bright, metallic, reece, etc.) plus optional detune for thickness.
   - Multiplies the STFT magnitude by this mask to emphasize harmonic structure; preserves phase; ISTFT back to time domain; re‑normalize.
 - Focus band (optional): applies a global soft band‑pass mask in log‑frequency (preset or custom low/high Hz), with outside‑band floor.
 - Rhythmic gate (optional): constructs an amplitude envelope from event onsets/offsets (attack/release), and applies it to the prompt.
 - Prepend path: resamples the prompt if needed, trims to “prompt seconds”, applies gain and fades, concatenates with the input, and trims peaks (≤ −1 dBFS).
 - Tagged filenames: include `scale`, `focus` (preset or band), and `seed_used` for easy A/B comparisons.
 - Determinism: fixed `seed` yields repeatable results; `-1` chooses a new random seed at each generation (Streamlit app).
+
+### Timbre Controls
+Located in **Melody → Advanced**, timbre controls change the texture of the imprinted melody to steer AI models toward different instrument characters:
+
+**Timbre presets** (harmonic amplitude distribution):
+| Preset | Character | Good for |
+|--------|-----------|----------|
+| `neutral` | Flat response (original) | Generic synthetic |
+| `dark` | Quick high‑harmonic rolloff | Deep sub, dubstep |
+| `bright` | Emphasizes higher harmonics | Harsh, buzzy leads |
+| `pluck` | Very quick rolloff | Tight bass plucks |
+| `reece` | Slow rolloff, full sound | Warm reece bass |
+| `vocal` | Strong low‑mid presence | Resonant bass tones |
+| `reed` | Odd harmonics emphasized | Clarinet‑like |
+| `bell` | Peak around 3rd harmonic | Metallic ringing |
+| `metallic` | 1/√k decay | Brass, cymbal‑like |
+
+**Mask shapes** (filter shape around each harmonic):
+- `gaussian` — smooth, bell‑shaped (default)
+- `triangle` — sharper, more defined peaks
+- `cauchy` — heavier tails, more smear/texture
+- `square` — hard edges, more synthetic
+
+**Detune** — subtle pitch offset (0–20 cents) adds thickness/chorus like unison detune on a synth. Try 5–15 cents for warmth/widening.
 
 ---
 

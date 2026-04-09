@@ -25,6 +25,43 @@ def _soft_band_envelope(f_hz, low_hz, high_hz, sharpness=12.0):
     return lo * hi
 
 
+def _timbre_weights(k: int, timbre: str) -> float:
+    """Return amplitude weight for the k-th harmonic based on timbre preset."""
+    if timbre == "bright":
+        return 1.0 + 0.15 * k  # Emphasize higher harmonics
+    elif timbre == "dark":
+        return np.exp(-0.25 * k)  # Quick rolloff
+    elif timbre == "pluck":
+        return np.exp(-0.5 * k)  # Very quick rolloff
+    elif timbre == "reece":
+        return 1.0 / (1.0 + 0.1 * k * k)  # Slow rolloff, full sound
+    elif timbre == "vocal":
+        return 1.0 if k <= 5 else 0.3  # Strong low-mid presence
+    elif timbre == "reed":
+        return 1.0 / k if k % 2 == 1 else 0.05 / k  # Odd harmonics emphasized
+    elif timbre == "bell":
+        return np.exp(-((k - 3) ** 2) / 4.0)  # Peak around 3rd harmonic
+    elif timbre == "metallic":
+        return 1.0 / np.sqrt(k)  # Slow decay, brassy/metallic
+    else:
+        return 1.0  # "neutral" - flat response
+
+
+def _mask_shape_kernel(freqs, fk, bw, shape: str) -> np.ndarray:
+    """Build a single harmonic mask with the specified shape."""
+    x = (freqs - fk) / (bw + 1e-6)
+    if shape == "gaussian":
+        return np.exp(-0.5 * x**2)
+    elif shape == "triangle":
+        return np.maximum(0.0, 1.0 - np.abs(x) / np.sqrt(2))
+    elif shape == "cauchy":
+        return 1.0 / (1.0 + x**2)  # Heavier tails than Gaussian
+    elif shape == "square":
+        return np.where(np.abs(x) < 1.0, 1.0, 0.0)
+    else:
+        return np.exp(-0.5 * x**2)
+
+
 def imprint_melody_focus(
     noise: np.ndarray,
     sr: int,
@@ -37,10 +74,15 @@ def imprint_melody_focus(
     band_floor_db: float = -18.0,
     sharpness: float = 12.0,
     n_fft: int = 2048,
+    timbre: str = "neutral",
+    mask_shape: str = "gaussian",
+    detune_cents: float = 0.0,
 ) -> np.ndarray:
     hop = n_fft // 4
     # Use Hann window with default boundary handling to satisfy NOLA/overlap-add conditions
-    freqs, times, Z = stft(noise, fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)
+    freqs, times, Z = stft(
+        noise, fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop
+    )
     mag, ph = np.abs(Z), np.angle(Z)
 
     if focus is not None:
@@ -74,22 +116,32 @@ def imprint_melody_focus(
             fk = k * f0
             if fk > freqs[-1]:
                 break
+            # Apply detune (in Hz) proportional to harmonic number
+            if detune_cents != 0.0:
+                fk *= 2.0 ** (detune_cents / 1200.0)
             bw = bw_frac * fk
-            mask += np.exp(-0.5 * ((freqs - fk) / (bw + 1e-6)) ** 2)
+            # Get timbre-based amplitude weight
+            weight = _timbre_weights(k, timbre)
+            # Build mask with chosen shape
+            mask += weight * _mask_shape_kernel(freqs, fk, bw, mask_shape)
         if mask.max() > 0:
             mask = 1.0 + (gain * (mask / mask.max()))
             mag[:, i] *= mask
 
     # Inverse STFT with matching window and hop
-    _, y = istft(mag * np.exp(1j * ph), fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)
+    _, y = istft(
+        mag * np.exp(1j * ph), fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop
+    )
     y = y[: len(noise)]
     y /= np.max(np.abs(y) + 1e-12)
     return y.astype(np.float32)
 
 
-def rhythmic_gate_from_events(events, sr: int, n_samples: int, attack: float = 0.01, release: float = 0.03):
+def rhythmic_gate_from_events(
+    events, sr: int, n_samples: int, attack: float = 0.01, release: float = 0.03
+):
     env = np.zeros(n_samples, dtype=float)
-    for (t0, t1, midi) in events:
+    for t0, t1, midi in events:
         s0 = int(np.round(t0 * sr))
         s1 = int(np.round(t1 * sr))
         s0 = max(0, min(n_samples - 1, s0))
@@ -99,7 +151,9 @@ def rhythmic_gate_from_events(events, sr: int, n_samples: int, attack: float = 0
         a = max(1, int(attack * sr))
         r = max(1, int(release * sr))
         seg = np.ones(s1 - s0, dtype=float)
-        seg[: min(a, len(seg))] *= np.linspace(0, 1, num=min(a, len(seg)), endpoint=False)
+        seg[: min(a, len(seg))] *= np.linspace(
+            0, 1, num=min(a, len(seg)), endpoint=False
+        )
         if r < len(seg):
             seg[-r:] *= np.linspace(1, 0, num=r, endpoint=True)
         env[s0:s1] = np.maximum(env[s0:s1], seg)
@@ -107,6 +161,7 @@ def rhythmic_gate_from_events(events, sr: int, n_samples: int, attack: float = 0
 
 
 # ---------------------- Low-end utilities (HPF / Mono lows) ---------------------- #
+
 
 def _design_hpf(sr: int, cutoff_hz: float, taps: int = 1025) -> np.ndarray:
     """Design a linear-phase FIR high-pass filter using a Kaiser window.
@@ -120,7 +175,9 @@ def _design_hpf(sr: int, cutoff_hz: float, taps: int = 1025) -> np.ndarray:
     return firwin(taps, cutoff, fs=sr, window=("kaiser", beta), pass_zero=False)
 
 
-def apply_hpf(y: np.ndarray, sr: int, cutoff_hz: float = 25.0, taps: int = 1025) -> np.ndarray:
+def apply_hpf(
+    y: np.ndarray, sr: int, cutoff_hz: float = 25.0, taps: int = 1025
+) -> np.ndarray:
     """Apply a zero-phase FIR high-pass to y.
 
     Works for mono (1D) or multi-channel (2D with shape [n, ch]).
@@ -137,7 +194,9 @@ def apply_hpf(y: np.ndarray, sr: int, cutoff_hz: float = 25.0, taps: int = 1025)
     return out
 
 
-def apply_mono_lows(y: np.ndarray, sr: int, cutoff_hz: float = 120.0, taps: int = 1025) -> np.ndarray:
+def apply_mono_lows(
+    y: np.ndarray, sr: int, cutoff_hz: float = 120.0, taps: int = 1025
+) -> np.ndarray:
     """Sum low frequencies below cutoff to mono while keeping highs stereo.
 
     If y is mono (1D), returns y unchanged.

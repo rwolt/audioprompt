@@ -15,10 +15,17 @@ def _rms_dbfs(y: np.ndarray) -> float:
     rms = float(np.sqrt(np.mean(y * y)) + 1e-12)
     return 20.0 * np.log10(rms)
 
+
 # Import core from ./src (ensure our local package takes precedence)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 # Import directly from submodules to avoid package-level side effects
-from audioprompt_core.audio import load_audio_mono, apply_fades, wav_bytes, wav_bytes_concat_segments, tag_suffix
+from audioprompt_core.audio import (
+    load_audio_mono,
+    apply_fades,
+    wav_bytes,
+    wav_bytes_concat_segments,
+    tag_suffix,
+)
 from audioprompt_core.prompt import (
     pink_noise,
     imprint_melody_focus,
@@ -35,6 +42,7 @@ from audioprompt_core.melody import (
 
 st.set_page_config(page_title="AudioPrompt", layout="wide")
 
+
 # ------------------------------ Debug helpers ------------------------------ #
 def _mem_usage_mb() -> float | None:
     """Best-effort current RSS in MB.
@@ -45,7 +53,8 @@ def _mem_usage_mb() -> float | None:
     # psutil preferred (current RSS)
     try:
         import psutil  # type: ignore
-        return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
+
+        return psutil.Process(os.getpid()).memory_info().rss / (1024**2)
     except Exception:
         pass
     # Linux /proc fallback
@@ -63,12 +72,14 @@ def _mem_usage_mb() -> float | None:
     # Last resort: peak (not current)
     try:
         import resource  # type: ignore
+
         rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         if sys.platform.startswith("darwin"):
-            return float(rss) / (1024 ** 2)  # bytes -> MB
+            return float(rss) / (1024**2)  # bytes -> MB
         return float(rss) / 1024.0  # kB -> MB
     except Exception:
         return None
+
 
 def _log_debug(msg: str):
     """Log diagnostics to server logs (stdout). Keeps UI clean.
@@ -104,6 +115,8 @@ def _upload_signature(uploaded_file):
     if uploaded_file is None:
         return None
     return (getattr(uploaded_file, "name", None), getattr(uploaded_file, "size", None))
+
+
 st.markdown(
     """
     <style>
@@ -211,15 +224,26 @@ def build_prompt(
     enable_gate: bool,
     imprint_params: dict,
     lowend_cfg: dict | None = None,
+    timbre_params: dict | None = None,
 ):
     n = int(sr * prompt_seconds)
     x_pink = pink_noise(n, sr, seed=seed)
     # Low-end processing before STFT (optional)
     if lowend_cfg:
         if lowend_cfg.get("tame_low_end"):
-            x_pink = apply_hpf(x_pink, sr, cutoff_hz=float(lowend_cfg.get("hpf_cutoff_hz", 25.0)), taps=int(lowend_cfg.get("hpf_taps", 2049)))
+            x_pink = apply_hpf(
+                x_pink,
+                sr,
+                cutoff_hz=float(lowend_cfg.get("hpf_cutoff_hz", 25.0)),
+                taps=int(lowend_cfg.get("hpf_taps", 2049)),
+            )
         if lowend_cfg.get("mono_lows"):
-            x_pink = apply_mono_lows(x_pink, sr, cutoff_hz=float(lowend_cfg.get("mono_cutoff_hz", 120.0)), taps=int(lowend_cfg.get("hpf_taps", 2049)))
+            x_pink = apply_mono_lows(
+                x_pink,
+                sr,
+                cutoff_hz=float(lowend_cfg.get("mono_cutoff_hz", 120.0)),
+                taps=int(lowend_cfg.get("hpf_taps", 2049)),
+            )
     events = None
     focus_arg = None
     if enable_focus:
@@ -267,6 +291,15 @@ def build_prompt(
             band_floor_db=imprint_params["floor_db"],
             sharpness=imprint_params["sharpness"],
             n_fft=int(imprint_params["n_fft"]),
+            timbre=timbre_params.get("timbre", "neutral")
+            if timbre_params
+            else "neutral",
+            mask_shape=timbre_params.get("mask_shape", "gaussian")
+            if timbre_params
+            else "gaussian",
+            detune_cents=timbre_params.get("detune_cents", 0.0)
+            if timbre_params
+            else 0.0,
         )
     elif enable_focus:
         y_prompt = imprint_melody_focus(
@@ -285,7 +318,9 @@ def build_prompt(
         y_prompt = x_pink.astype(np.float32)
 
     if enable_gate and events is not None:
-        gate = rhythmic_gate_from_events(events, sr, n_samples=n, attack=0.01, release=0.03)
+        gate = rhythmic_gate_from_events(
+            events, sr, n_samples=n, attack=0.01, release=0.03
+        )
         y_prompt = (y_prompt * (0.15 + 0.85 * gate)).astype(np.float32)
 
     # Normalize
@@ -355,9 +390,8 @@ st.markdown("<div class='main-cols'>", unsafe_allow_html=True)
 left, right = st.columns(2, gap="large")
 
 with left:
-
     st.subheader("Melody")
-    mcol1, mcol2 = st.columns([1,1])
+    mcol1, mcol2 = st.columns([1, 1])
     with mcol1:
         enable_melody = st.checkbox(
             "Enable melody",
@@ -371,7 +405,7 @@ with left:
             help="Apply a note‑shaped amplitude envelope for phrasing.",
         )
     if enable_melody:
-        roots = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
+        roots = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
         scales = sorted(list(SCALES.keys()))
         # Root and Scale side-by-side
         msel1, msel2 = st.columns(2, gap="small")
@@ -386,28 +420,124 @@ with left:
             melody_scale = st.selectbox(
                 "Scale",
                 options=scales,
-                index=scales.index("minor_pentatonic") if "minor_pentatonic" in scales else 0,
+                index=scales.index("minor_pentatonic")
+                if "minor_pentatonic" in scales
+                else 0,
                 help="Choose from major/modes, pentatonics, blues, etc.",
             )
 
         col1, col2 = st.columns(2, gap="small")
         with col1:
-            bpm = st.slider("BPM", 40, 220, 96, 1, help="Tempo driving randomized note durations.")
+            bpm = st.slider(
+                "BPM", 40, 220, 96, 1, help="Tempo driving randomized note durations."
+            )
         with col2:
-            vib_hz = st.slider("Vibrato Hz", 3.0, 9.0, 5.5, 0.1, help="Rate of pitch modulation.")
-        vib_depth = st.slider("Vibrato depth", 0.0, 0.05, 0.02, 0.001, help="Depth of pitch modulation (fraction).")
+            vib_hz = st.slider(
+                "Vibrato Hz", 3.0, 9.0, 5.5, 0.1, help="Rate of pitch modulation."
+            )
+        vib_depth = st.slider(
+            "Vibrato depth",
+            0.0,
+            0.05,
+            0.02,
+            0.001,
+            help="Depth of pitch modulation (fraction).",
+        )
 
         with st.expander("Melody – Advanced", expanded=False):
             colA1, colA2 = st.columns(2, gap="small")
             with colA1:
-                low_midi = st.slider("Low MIDI", 24, 84, 55, 1, help="Register floor (C4=60).")
-                step_bias = st.slider("Step bias", 0.0, 1.0, 0.5, 0.01, help="Probability of moving to a neighboring scale degree.")
-                glide_prob = st.slider("Glide prob", 0.0, 1.0, 0.25, 0.01, help="Probability of sliding into the next note.")
+                low_midi = st.slider(
+                    "Low MIDI", 24, 84, 55, 1, help="Register floor (C4=60)."
+                )
+                step_bias = st.slider(
+                    "Step bias",
+                    0.0,
+                    1.0,
+                    0.5,
+                    0.01,
+                    help="Probability of moving to a neighboring scale degree.",
+                )
+                glide_prob = st.slider(
+                    "Glide prob",
+                    0.0,
+                    1.0,
+                    0.25,
+                    0.01,
+                    help="Probability of sliding into the next note.",
+                )
             with colA2:
-                high_midi = st.slider("High MIDI", 36, 96, 79, 1, help="Register ceiling. Keep Low < High.")
-                leap_steps = st.slider("Max leap (scale steps)", 1, 8, 7, 1, help="Largest jump when not stepping.")
-                glide_frac = st.slider("Glide frac", 0.0, 0.9, 0.35, 0.01, help="Portion of the note duration spent gliding.")
-            rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.12, 0.01, help="Chance of rests vs notes.")
+                high_midi = st.slider(
+                    "High MIDI",
+                    36,
+                    96,
+                    79,
+                    1,
+                    help="Register ceiling. Keep Low < High.",
+                )
+                leap_steps = st.slider(
+                    "Max leap (scale steps)",
+                    1,
+                    8,
+                    7,
+                    1,
+                    help="Largest jump when not stepping.",
+                )
+                glide_frac = st.slider(
+                    "Glide frac",
+                    0.0,
+                    0.9,
+                    0.35,
+                    0.01,
+                    help="Portion of the note duration spent gliding.",
+                )
+            rest_prob = st.slider(
+                "Rest prob", 0.0, 0.5, 0.12, 0.01, help="Chance of rests vs notes."
+            )
+
+            st.divider()
+            st.markdown("**Timbre** — change the texture of the imprinted melody")
+            timbre_preset = st.selectbox(
+                "Timbre preset",
+                options=[
+                    "neutral",
+                    "bright",
+                    "dark",
+                    "pluck",
+                    "reece",
+                    "vocal",
+                    "reed",
+                    "bell",
+                    "metallic",
+                ],
+                index=0,
+                help=(
+                    "Controls harmonic amplitudes to change the timbral character of the imprinted melody. "
+                    "'neutral' = flat (original synthetic sound). 'dark/reece' = deep bass sounds. "
+                    "'bright/metallic' = harsh/brassy. 'pluck' = tight, short. 'vocal/reed/bell' = resonant tones."
+                ),
+            )
+            mask_shape = st.selectbox(
+                "Mask shape",
+                options=["gaussian", "triangle", "cauchy", "square"],
+                index=0,
+                help=(
+                    "Changes the filter shape around each harmonic. 'gaussian' = smooth and natural. "
+                    "'triangle' = sharper, more defined. 'cauchy' = heavier tails, more smear/texture. "
+                    "'square' = hard edges, more synthetic."
+                ),
+            )
+            detune_cents = st.slider(
+                "Detune (cents)",
+                0.0,
+                20.0,
+                0.0,
+                0.5,
+                help=(
+                    "Subtle pitch offset for thickness/chorus effect. Adds slight detune to harmonics "
+                    "(like unison on a synth). 0 = no detune, 5-15 = subtle warmth/widening."
+                ),
+            )
     else:
         # Provide defaults when melody disabled to keep variables defined
         melody_root = "E"
@@ -417,12 +547,13 @@ with left:
         step_bias, leap_steps, rest_prob = 0.5, 7, 0.12
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
+        timbre_preset, mask_shape, detune_cents = "neutral", "gaussian", 0.0
 
     # Add ~36px top margin before Focus header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
     # Focus (left) — for future tabs, keep flat containers
     st.subheader("Focus")
-    fcol1, fcol2 = st.columns([1,1])
+    fcol1, fcol2 = st.columns([1, 1])
     with fcol1:
         enable_focus = st.checkbox(
             "Enable focus band",
@@ -449,42 +580,76 @@ with left:
     if enable_focus:
         with st.expander("Focus Band – Advanced", expanded=(focus_preset == "custom")):
             if focus_preset == "custom":
-                band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
+                band = st.slider(
+                    "Focus Hz band",
+                    20,
+                    20000,
+                    (120, 3200),
+                    step=10,
+                    help="Twin‑handle slider: low/high cutoff in Hz.",
+                )
             else:
                 band = None
             colf1, colf2, colf3 = st.columns(3)
             with colf1:
-                imprint_gain = st.slider("Imprint gain", 0.0, 16.0, 8.0, 0.5, help="Strength of harmonic emphasis.")
+                imprint_gain = st.slider(
+                    "Imprint gain",
+                    0.0,
+                    16.0,
+                    8.0,
+                    0.5,
+                    help="Strength of harmonic emphasis.",
+                )
             with colf2:
-                harmonics = st.slider("Harmonics", 0, 16, 10, 1, help="Number of harmonic peaks.")
+                harmonics = st.slider(
+                    "Harmonics", 0, 16, 10, 1, help="Number of harmonic peaks."
+                )
             with colf3:
-                bw_frac = st.slider("BW frac", 0.002, 0.05, 0.01, 0.001, help="Relative bandwidth around each harmonic.")
+                bw_frac = st.slider(
+                    "BW frac",
+                    0.002,
+                    0.05,
+                    0.01,
+                    0.001,
+                    help="Relative bandwidth around each harmonic.",
+                )
             colf4, colf5 = st.columns(2)
             with colf4:
-                floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
+                floor_db = st.slider(
+                    "Band floor (dB)",
+                    -36,
+                    0,
+                    -18,
+                    1,
+                    help="Attenuation outside the focus band.",
+                )
             with colf5:
-                sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Steepness of the band edges.")
+                sharpness = st.slider(
+                    "Band edge sharpness",
+                    6,
+                    24,
+                    12,
+                    1,
+                    help="Steepness of the band edges.",
+                )
             # Low‑end advanced controls hidden for now; using sensible defaults
     else:
         band = None
         imprint_gain, harmonics, bw_frac, floor_db, sharpness = 8.0, 10, 0.01, -18.0, 12
 
     # Build Focus/imprint/low‑end configs for generation
-    focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
-    imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
-    # Defaults while advanced controls are hidden
-    hpf_taps = 2049  # Steep by default
-    lowend_cfg = dict(
-        tame_low_end=bool(tame_low_end),
-        hpf_cutoff_hz=25,
-        hpf_taps=int(hpf_taps),
-        mono_lows=True,
-        mono_cutoff_hz=120,
+    focus_params = dict(
+        preset=focus_preset if focus_preset != "none" else None, band=band
     )
-
-    # Build Focus/imprint/low‑end configs for generation
-    focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
-    imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
+    imprint_params = dict(
+        gain=locals().get("imprint_gain", 8.0),
+        harmonics=locals().get("harmonics", 10),
+        bw_frac=locals().get("bw_frac", 0.01),
+        floor_db=locals().get("floor_db", -18.0),
+        sharpness=locals().get("sharpness", 12),
+        n_fft=2048,
+    )
+    # Defaults while advanced controls are hidden
     hpf_taps = 2049  # Steep by default
     lowend_cfg = dict(
         tame_low_end=bool(tame_low_end),
@@ -517,8 +682,22 @@ with right:
         vib_hz=float(vib_hz),
         vib_depth=float(vib_depth),
     )
-    focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
-    imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
+    timbre_params = dict(
+        timbre=timbre_preset,
+        mask_shape=mask_shape,
+        detune_cents=float(detune_cents),
+    )
+    focus_params = dict(
+        preset=focus_preset if focus_preset != "none" else None, band=band
+    )
+    imprint_params = dict(
+        gain=locals().get("imprint_gain", 8.0),
+        harmonics=locals().get("harmonics", 10),
+        bw_frac=locals().get("bw_frac", 0.01),
+        floor_db=locals().get("floor_db", -18.0),
+        sharpness=locals().get("sharpness", 12),
+        n_fft=2048,
+    )
     # Low-end config dict for core processing
     hpf_taps = 2049  # Steep by default
     lowend_cfg = dict(
@@ -533,7 +712,7 @@ with right:
     with gen_top:
         st.subheader("Generate")
         st.markdown("<div class='gen-row'>", unsafe_allow_html=True)
-        btn_col, seed_col = st.columns([3,1], gap="medium")
+        btn_col, seed_col = st.columns([3, 1], gap="medium")
         with btn_col:
             pressed = st.button("Generate Prompt", type="primary", width="stretch")
         with seed_col:
@@ -561,17 +740,20 @@ with right:
             help="Length of the generated prompt (also used when prepending).",
         )
         st.markdown("**Prompt Level**")
-        ag_col1, ag_col2 = st.columns([1,1])
+        ag_col1, ag_col2 = st.columns([1, 1])
         with ag_col1:
             auto_gain = st.checkbox(
                 "Auto gain (match input audio)",
                 value=False,
-                help="Detect input audio loudness and set the prompt level automatically (RMS in dBFS)."
+                help="Detect input audio loudness and set the prompt level automatically (RMS in dBFS).",
             )
         with ag_col2:
             auto_gain_offset_db = st.slider(
                 "Prompt relative to input (dB)",
-                -12.0, 6.0, -3.0, 0.5,
+                -12.0,
+                6.0,
+                -3.0,
+                0.5,
                 help="Target prompt loudness relative to input RMS (e.g., −3 dB makes the prompt slightly quieter).",
                 disabled=not auto_gain,
             )
@@ -580,14 +762,21 @@ with right:
         with colo1:
             prompt_gain_db = st.slider(
                 "Prompt gain (dB)",
-                -24.0, 6.0, -3.0, 0.5,
+                -24.0,
+                6.0,
+                -3.0,
+                0.5,
                 help="Level for the prepended prompt.",
                 disabled=auto_gain,
             )
         with colo2:
-            fade_in_ms = st.slider("Fade-in (ms)", 0, 200, 10, 1, help="Smooth ramp at the start.")
+            fade_in_ms = st.slider(
+                "Fade-in (ms)", 0, 200, 10, 1, help="Smooth ramp at the start."
+            )
         with colo3:
-            fade_out_ms = st.slider("Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end.")
+            fade_out_ms = st.slider(
+                "Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end."
+            )
 
         # (Outputs header and preview toggle appear below, just before outputs)
 
@@ -599,7 +788,11 @@ with right:
                 _clear_outputs()
                 # Resolve seed: -1 means random each generation
                 seed_input = int(st.session_state.get("seed", 7))
-                seed_to_use = int(np.random.randint(0, 10_000_000)) if seed_input == -1 else seed_input
+                seed_to_use = (
+                    int(np.random.randint(0, 10_000_000))
+                    if seed_input == -1
+                    else seed_input
+                )
                 _log_debug(f"[gen] seed={seed_to_use}; mem_before={_mem_usage_mb()} MB")
                 y_prompt, events = build_prompt(
                     sr=int(sr),
@@ -612,11 +805,17 @@ with right:
                     enable_gate=bool(enable_gate),
                     imprint_params=imprint_params,
                     lowend_cfg=lowend_cfg,
+                    timbre_params=timbre_params,
                 )
-                st.session_state["y_prompt"], st.session_state["events"] = y_prompt, events
+                st.session_state["y_prompt"], st.session_state["events"] = (
+                    y_prompt,
+                    events,
+                )
                 st.session_state["seed_used"] = seed_to_use
                 st.session_state["prompt_sr"] = int(sr)
-                _log_debug(f"[gen] prompt_len={len(y_prompt)} samples @ {int(sr)} Hz; mem_after={_mem_usage_mb()} MB")
+                _log_debug(
+                    f"[gen] prompt_len={len(y_prompt)} samples @ {int(sr)} Hz; mem_after={_mem_usage_mb()} MB"
+                )
 
         # Outputs header
         st.subheader("Outputs")
@@ -628,8 +827,12 @@ with right:
             sr_prompt_local = int(st.session_state.get("prompt_sr", int(sr)))
 
             # File naming for prompt/combined
-            seed_val_local = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
-            base_stem_local = Path(uploaded.name).stem if uploaded is not None else "prompt"
+            seed_val_local = int(
+                st.session_state.get("seed_used", st.session_state.get("seed", 7))
+            )
+            base_stem_local = (
+                Path(uploaded.name).stem if uploaded is not None else "prompt"
+            )
             suffix_local = tag_suffix(
                 enable_melody,
                 melody_scale,
@@ -656,16 +859,21 @@ with right:
             st.caption(f"Seed used: {seed_val_local}")
             st.markdown("**Prompt**")
             prompt_key_now = ("prompt", int(sr_prompt_local), int(seed_val_local))
-            if st.session_state.get("prompt_key") != prompt_key_now or "prompt_bytes" not in st.session_state:
+            if (
+                st.session_state.get("prompt_key") != prompt_key_now
+                or "prompt_bytes" not in st.session_state
+            ):
                 prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
                 st.session_state["prompt_bytes"] = prompt_wav_local
                 st.session_state["prompt_key"] = prompt_key_now
-                _log_debug(f"[prompt] wav_bytes={len(prompt_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB (encoded)")
+                _log_debug(
+                    f"[prompt] wav_bytes={len(prompt_wav_local) / 1e6:.2f} MB; mem={_mem_usage_mb()} MB (encoded)"
+                )
             else:
                 prompt_wav_local = st.session_state["prompt_bytes"]
                 _log_debug(f"[prompt] reused cache; mem={_mem_usage_mb()} MB")
             st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
-            ap_col_audio, ap_col_btn = st.columns([4,1], gap="small")
+            ap_col_audio, ap_col_btn = st.columns([4, 1], gap="small")
             with ap_col_audio:
                 st.audio(prompt_wav_local, format="audio/wav")
             with ap_col_btn:
@@ -695,41 +903,69 @@ with right:
                     # Resample prompt if SR differs
                     if sr_prompt_local != int(sr):
                         g_local = np.gcd(sr_prompt_local, int(sr))
-                        prompt_local = resample_poly(prompt_local, int(sr) // g_local, sr_prompt_local // g_local).astype(np.float32)
+                        prompt_local = resample_poly(
+                            prompt_local, int(sr) // g_local, sr_prompt_local // g_local
+                        ).astype(np.float32)
                     prompt_local = prompt_local[:target_len_local]
                     # Auto/Manual gain
                     if auto_gain:
                         try:
                             seed_rms_db_local = _rms_dbfs(x_local)
-                            prompt_rms_db_local = _rms_dbfs(prompt_local[:target_len_local]) if target_len_local > 0 else _rms_dbfs(prompt_local)
-                            desired_db_local = seed_rms_db_local + float(auto_gain_offset_db)
+                            prompt_rms_db_local = (
+                                _rms_dbfs(prompt_local[:target_len_local])
+                                if target_len_local > 0
+                                else _rms_dbfs(prompt_local)
+                            )
+                            desired_db_local = seed_rms_db_local + float(
+                                auto_gain_offset_db
+                            )
                             gain_db_local = desired_db_local - prompt_rms_db_local
                         except Exception:
                             gain_db_local = float(prompt_gain_db)
                     else:
                         gain_db_local = float(prompt_gain_db)
                     gain_local = 10 ** (gain_db_local / 20.0)
-                    prompt_local = apply_fades(prompt_local * gain_local, int(sr), int(fade_in_ms), int(fade_out_ms))
+                    prompt_local = apply_fades(
+                        prompt_local * gain_local,
+                        int(sr),
+                        int(fade_in_ms),
+                        int(fade_out_ms),
+                    )
 
                     # Build or reuse Combined WAV without allocating a large concatenated array
                     combined_key_now = (
                         "combined",
-                        int(sr), float(prompt_seconds), int(seed_val_local),
-                        bool(auto_gain), float(auto_gain_offset_db) if auto_gain else float(prompt_gain_db),
-                        int(fade_in_ms), int(fade_out_ms),
-                        getattr(uploaded, "name", None), getattr(uploaded, "size", None),
+                        int(sr),
+                        float(prompt_seconds),
+                        int(seed_val_local),
+                        bool(auto_gain),
+                        float(auto_gain_offset_db)
+                        if auto_gain
+                        else float(prompt_gain_db),
+                        int(fade_in_ms),
+                        int(fade_out_ms),
+                        getattr(uploaded, "name", None),
+                        getattr(uploaded, "size", None),
                     )
-                    if st.session_state.get("combined_key") != combined_key_now or "combined_bytes" not in st.session_state:
-                        combined_wav_local = wav_bytes_concat_segments([prompt_local, x_local.astype(np.float32, copy=False)], int(sr))
+                    if (
+                        st.session_state.get("combined_key") != combined_key_now
+                        or "combined_bytes" not in st.session_state
+                    ):
+                        combined_wav_local = wav_bytes_concat_segments(
+                            [prompt_local, x_local.astype(np.float32, copy=False)],
+                            int(sr),
+                        )
                         st.session_state["combined_bytes"] = combined_wav_local
                         st.session_state["combined_key"] = combined_key_now
-                        _log_debug(f"[combined] built; wav_bytes={len(combined_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB")
+                        _log_debug(
+                            f"[combined] built; wav_bytes={len(combined_wav_local) / 1e6:.2f} MB; mem={_mem_usage_mb()} MB"
+                        )
                     else:
                         combined_wav_local = st.session_state["combined_bytes"]
                         _log_debug(f"[combined] reused cache; mem={_mem_usage_mb()} MB")
                     st.markdown("**Combined**")
                     st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
-                    cap_col_audio, cap_col_btn = st.columns([4,1], gap="small")
+                    cap_col_audio, cap_col_btn = st.columns([4, 1], gap="small")
                     with cap_col_audio:
                         st.audio(combined_wav_local, format="audio/wav")
                     with cap_col_btn:
@@ -750,10 +986,19 @@ with right:
                     _log_debug(f"[combined] locals cleared; mem={_mem_usage_mb()} MB")
         # Blue placeholders when outputs are not ready (pill style)
         if "y_prompt" not in st.session_state:
-            st.markdown("<div class='spec-placeholder'>Set your parameters and press Generate Prompt.</div>", unsafe_allow_html=True)
-            st.markdown("<div class='spec-placeholder'>No input file uploaded; only the prompt is generated.</div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='spec-placeholder'>Set your parameters and press Generate Prompt.</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div class='spec-placeholder'>No input file uploaded; only the prompt is generated.</div>",
+                unsafe_allow_html=True,
+            )
         elif uploaded is None:
-            st.markdown("<div class='spec-placeholder'>No input file uploaded; only the prompt is generated.</div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='spec-placeholder'>No input file uploaded; only the prompt is generated.</div>",
+                unsafe_allow_html=True,
+            )
 
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
