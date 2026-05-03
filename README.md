@@ -9,7 +9,8 @@ Demo: [https://audioprompt.streamlit.app/](https://audioprompt.streamlit.app/)
 - 🧠 Scale‑driven melody imprint (randomized, in‑key, with vibrato/glides)
 - 🎚️ Spectral focus (vocal/guitar/bass presets or custom Hz band)
 - 🥁 Rhythmic gate from note events (phrase‑like envelope)
-- 📎 Drag‑and‑drop input; tagged downloads (scale/focus/seed)
+- 🥁 **Drum MIDI Imprint** — upload a MIDI drum track to generate a rhythmic noise layer (velocity‑sensitive kick/snare/hat/perc layers with blend controls)
+- 📎 Drag‑and‑drop input; tagged downloads (scale/focus/drum/seed)
 - 🧰 Pure Python DSP (NumPy/SciPy/soundfile)
 
 ---
@@ -115,7 +116,7 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 
 ## 📁 Project Layout
 - `audioprompt_app/` — Streamlit app (two‑column UI, dark theme, drag‑drop upload)
-- `audioprompt_app/src/audioprompt_core/` — shared core (audio, melody, prompt)
+- `audioprompt_app/src/audioprompt_core/` — shared core (audio, melody, prompt, mididrums, drumnoise)
 - `audioprompt.py` — CLI (analyze/prompt/prepend)
 - `requirements.txt` — minimal dependencies for the CLI/analysis tools
 
@@ -132,8 +133,9 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
   - Multiplies the STFT magnitude by this mask to emphasize harmonic structure; preserves phase; ISTFT back to time domain; re‑normalize.
 - Focus band (optional): applies a global soft band‑pass mask in log‑frequency (preset or custom low/high Hz), with outside‑band floor.
 - Rhythmic gate (optional): constructs an amplitude envelope from event onsets/offsets (attack/release), and applies it to the prompt.
+- Drum MIDI Imprint (optional): parses a General MIDI drum track, maps notes to kick/snare/hat/perc lanes, generates band-limited pink noise per lane, and applies velocity-sensitive AD envelopes. Per-lane gains and a blend slider let you balance the drum layer against the melody layer.
 - Prepend path: resamples the prompt if needed, trims to “prompt seconds”, applies gain and fades, concatenates with the input, and trims peaks (≤ −1 dBFS).
-- Tagged filenames: include `scale`, `focus` (preset or band), and `seed_used` for easy A/B comparisons.
+- Tagged filenames: include `scale`, `focus`, `drum` (yes/no), and `seed_used` for easy A/B comparisons.
 - Determinism: fixed `seed` yields repeatable results; `-1` chooses a new random seed at each generation (Streamlit app).
 
 ---

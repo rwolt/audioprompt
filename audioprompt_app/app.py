@@ -31,6 +31,13 @@ from audioprompt_core.melody import (
     generate_random_melody,
     events_to_f0,
 )
+from audioprompt_core.mididrums import (
+    parse_midi_drum_events,
+    LANES,
+)
+from audioprompt_core.drumnoise import (
+    synthesize_drum_layer,
+)
 
 
 st.set_page_config(page_title="AudioPrompt", layout="wide")
@@ -90,6 +97,8 @@ def _clear_outputs():
         "combined_bytes",
         "combined_key",
         "combined_name",
+        "drum_prompt_bytes",
+        "drum_prompt_key",
     ):
         try:
             st.session_state.pop(k, None)
@@ -418,6 +427,49 @@ with left:
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
 
+    # Add ~36px top margin before Drum header for clearer separation
+    st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
+    # Drum MIDI Imprint (left) — completely separate from melody module
+    st.subheader("Drum MIDI Imprint")
+    enable_drum = st.checkbox(
+        "Enable drum MIDI imprint",
+        value=False,
+        help="Upload a MIDI drum track to generate a rhythm layer from band-limited pink noise.",
+    )
+    drum_midi_file = None
+    drum_lane_gains = {}
+    if enable_drum:
+        drum_midi_file = st.file_uploader(
+            "Drum MIDI (.mid / .midi)",
+            type=["mid", "midi"],
+            accept_multiple_files=False,
+            help="Upload a General MIDI drum track (.mid / .midi). Kick=36, Snare=38, Hat=42.",
+            key="drum_midi_file",
+        )
+        if drum_midi_file is not None:
+            st.caption(f"Uploaded: {drum_midi_file.name}")
+            # BPM is parsed during generation and shown there to avoid interfering
+            # with the drag-and-drop upload handshake.
+        else:
+            st.session_state.pop("y_drum", None)
+            st.session_state.pop("drum_bpm", None)
+
+        dr1, dr2 = st.columns(2, gap="small")
+        with dr1:
+            kick_gain = st.slider("Kick amount", 0.0, 2.0, 1.0, 0.05, help="Gain for kick lane.")
+            snare_gain = st.slider("Snare amount", 0.0, 2.0, 0.9, 0.05, help="Gain for snare lane.")
+        with dr2:
+            hat_gain = st.slider("Hat amount", 0.0, 2.0, 0.7, 0.05, help="Gain for hi-hat / cymbal lane.")
+            perc_gain = st.slider("Perc amount", 0.0, 2.0, 0.5, 0.05, help="Gain for other percussion.")
+        drum_lane_gains = {
+            "kick": kick_gain,
+            "snare": snare_gain,
+            "hat": hat_gain,
+            "perc": perc_gain,
+        }
+    else:
+        drum_lane_gains = {"kick": 1.0, "snare": 0.9, "hat": 0.7, "perc": 0.5}
+
     # Add ~36px top margin before Focus header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
     # Focus (left) — for future tabs, keep flat containers
@@ -589,6 +641,22 @@ with right:
         with colo3:
             fade_out_ms = st.slider("Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end.")
 
+        # Blend controls — always visible so the user can tune the mix
+        st.markdown("**Layer Blend**")
+        bl1, bl2 = st.columns(2, gap="small")
+        with bl1:
+            melody_blend_gain = st.slider(
+                "Melody level",
+                0.0, 2.0, 1.0, 0.05,
+                help="Gain for the melody / focus / pink-noise layer.",
+            )
+        with bl2:
+            drum_blend_gain = st.slider(
+                "Drum level",
+                0.0, 2.0, 1.0, 0.05,
+                help="Gain for the drum MIDI layer.",
+            )
+
         # (Outputs header and preview toggle appear below, just before outputs)
 
         # Generate immediately after controls so results are available below in this same run
@@ -601,6 +669,7 @@ with right:
                 seed_input = int(st.session_state.get("seed", 7))
                 seed_to_use = int(np.random.randint(0, 10_000_000)) if seed_input == -1 else seed_input
                 _log_debug(f"[gen] seed={seed_to_use}; mem_before={_mem_usage_mb()} MB")
+                # Melody prompt
                 y_prompt, events = build_prompt(
                     sr=int(sr),
                     prompt_seconds=float(prompt_seconds),
@@ -613,10 +682,39 @@ with right:
                     imprint_params=imprint_params,
                     lowend_cfg=lowend_cfg,
                 )
+                # If neither melody nor focus is on, silence the melody layer
+                # so drum-only output is truly just the drum layer.
+                if not enable_melody and not enable_focus and enable_drum:
+                    y_prompt = np.zeros_like(y_prompt)
+                    events = None
                 st.session_state["y_prompt"], st.session_state["events"] = y_prompt, events
                 st.session_state["seed_used"] = seed_to_use
                 st.session_state["prompt_sr"] = int(sr)
-                _log_debug(f"[gen] prompt_len={len(y_prompt)} samples @ {int(sr)} Hz; mem_after={_mem_usage_mb()} MB")
+                _log_debug(f"[gen] melody prompt_len={len(y_prompt)} samples @ {int(sr)} Hz; mem_after={_mem_usage_mb()} MB")
+
+                # Drum MIDI prompt
+                if enable_drum and drum_midi_file is not None:
+                    try:
+                        drum_lanes, drum_bpm = parse_midi_drum_events(drum_midi_file.getvalue())
+                        _log_debug(f"[gen] drum MIDI parsed: {drum_bpm} BPM")
+                        y_drum = synthesize_drum_layer(
+                            drum_lanes,
+                            sr=int(sr),
+                            prompt_seconds=float(prompt_seconds),
+                            seed=seed_to_use + 1,  # correlated but not identical
+                            lane_gains=drum_lane_gains,
+                            master_gain=1.0,  # full-level; blend gain applied at render time
+                        )
+                        st.session_state["y_drum"] = y_drum
+                        st.session_state["drum_bpm"] = drum_bpm
+                        _log_debug(f"[gen] drum layer: len={len(y_drum)}, peak={np.max(np.abs(y_drum)):.4f}")
+                    except Exception as e:
+                        _log_debug(f"[gen] drum error: {e}")
+                        st.error(f"Failed to parse drum MIDI. Make sure you uploaded a valid .mid/.midi file.\nError: {e}")
+                        st.session_state.pop("y_drum", None)
+                else:
+                    st.session_state.pop("y_drum", None)
+                    st.session_state.pop("drum_bpm", None)
 
         # Outputs header
         st.subheader("Outputs")
@@ -626,6 +724,22 @@ with right:
             # Build prompt WAV using stored prompt SR
             y_prompt_local = st.session_state["y_prompt"]
             sr_prompt_local = int(st.session_state.get("prompt_sr", int(sr)))
+
+            # Blend melody + drum if drum layer exists (with user-controlled gains)
+            if "y_drum" in st.session_state:
+                y_drum_local = st.session_state["y_drum"]
+                min_len = min(len(y_prompt_local), len(y_drum_local))
+                m_gain = float(melody_blend_gain)
+                d_gain = float(drum_blend_gain)
+                y_blend = (y_prompt_local[:min_len] * m_gain) + (y_drum_local[:min_len] * d_gain)
+                peak = float(np.max(np.abs(y_blend)) + 1e-12)
+                if peak > 0:
+                    y_blend = (y_blend / peak).astype(np.float32)
+                y_render = y_blend
+                _log_debug(f"[render] blend m={m_gain:.2f} d={d_gain:.2f}; peak after norm={np.max(np.abs(y_render)):.4f}")
+            else:
+                y_render = (y_prompt_local * float(melody_blend_gain)).astype(np.float32)
+                _log_debug(f"[render] melody only, gain={float(melody_blend_gain):.2f}")
 
             # File naming for prompt/combined
             seed_val_local = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
@@ -638,6 +752,7 @@ with right:
                 band if focus_params.get("preset") is None else None,
                 seed_val_local,
                 output_suffix,
+                enable_drum=enable_drum,
             )
             prompt_only_name_local = f"{base_stem_local}_prompt_scale-{melody_scale if enable_melody else 'none'}_root-{melody_root}_focus-"
             if enable_focus:
@@ -649,15 +764,26 @@ with right:
                     prompt_only_name_local += "custom"
             else:
                 prompt_only_name_local += "none"
-            prompt_only_name_local += f"_seed-{seed_val_local}.wav"
+            drum_tag = "drum" if enable_drum else "nodrum"
+            prompt_only_name_local += f"_drum-{drum_tag}_seed-{seed_val_local}.wav"
 
             # Prompt audio + download (render below in this column)
             # Reuse cached prompt bytes if parameters unchanged
             st.caption(f"Seed used: {seed_val_local}")
+            if "y_drum" in st.session_state:
+                drum_bpm_display = st.session_state.get("drum_bpm", "—")
+                st.caption(f"Drum layer: {drum_bpm_display} BPM")
             st.markdown("**Prompt**")
-            prompt_key_now = ("prompt", int(sr_prompt_local), int(seed_val_local))
+            prompt_key_now = (
+                "prompt",
+                int(sr_prompt_local),
+                int(seed_val_local),
+                bool(enable_drum),
+                round(float(melody_blend_gain), 3),
+                round(float(drum_blend_gain), 3),
+            )
             if st.session_state.get("prompt_key") != prompt_key_now or "prompt_bytes" not in st.session_state:
-                prompt_wav_local = wav_bytes(y_prompt_local, sr_prompt_local)
+                prompt_wav_local = wav_bytes(y_render, sr_prompt_local)
                 st.session_state["prompt_bytes"] = prompt_wav_local
                 st.session_state["prompt_key"] = prompt_key_now
                 _log_debug(f"[prompt] wav_bytes={len(prompt_wav_local)/1e6:.2f} MB; mem={_mem_usage_mb()} MB (encoded)")
@@ -691,7 +817,7 @@ with right:
                     x_local = None
                 if x_local is not None:
                     target_len_local = int(round(float(prompt_seconds) * int(sr)))
-                    prompt_local = y_prompt_local
+                    prompt_local = y_render
                     # Resample prompt if SR differs
                     if sr_prompt_local != int(sr):
                         g_local = np.gcd(sr_prompt_local, int(sr))
@@ -718,6 +844,7 @@ with right:
                         bool(auto_gain), float(auto_gain_offset_db) if auto_gain else float(prompt_gain_db),
                         int(fade_in_ms), int(fade_out_ms),
                         getattr(uploaded, "name", None), getattr(uploaded, "size", None),
+                        bool(enable_drum),
                     )
                     if st.session_state.get("combined_key") != combined_key_now or "combined_bytes" not in st.session_state:
                         combined_wav_local = wav_bytes_concat_segments([prompt_local, x_local.astype(np.float32, copy=False)], int(sr))

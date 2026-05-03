@@ -121,7 +121,16 @@ def wav_bytes_concat_segments(segments: list[np.ndarray], sr: int, peak_limit: f
     return bio.getvalue()
 
 
-def tag_suffix(enable_melody: bool, melody_scale: str, enable_focus: bool, focus_preset: Union[str, None], focus_band: Union[Tuple[int, int], None], seed: int, output_suffix: str) -> str:
+def tag_suffix(
+    enable_melody: bool,
+    melody_scale: str,
+    enable_focus: bool,
+    focus_preset: Union[str, None],
+    focus_band: Union[Tuple[int, int], None],
+    seed: int,
+    output_suffix: str,
+    enable_drum: bool = False,
+) -> str:
     scale_tag = melody_scale if enable_melody else "none"
     if enable_focus:
         if isinstance(focus_preset, str) and focus_preset:
@@ -133,4 +142,5 @@ def tag_suffix(enable_melody: bool, melody_scale: str, enable_focus: bool, focus
             focus_tag = "custom"
     else:
         focus_tag = "none"
-    return f"{output_suffix}_scale-{scale_tag}_focus-{focus_tag}_seed-{seed}"
+    drum_tag = "drum" if enable_drum else "nodrum"
+    return f"{output_suffix}_scale-{scale_tag}_focus-{focus_tag}_drum-{drum_tag}_seed-{seed}"
