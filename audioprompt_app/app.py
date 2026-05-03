@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import streamlit as st
 from scipy.signal import resample_poly
-import matplotlib.pyplot as plt
+
 import streamlit.components.v1 as components
 
 
@@ -208,9 +208,6 @@ _DRAG_JS = """
 </script>
 """
 
-
-def clamp(v, lo, hi):
-    return max(lo, min(hi, v))
 
 
 def build_prompt(
@@ -637,28 +634,6 @@ with left:
         band = None
         imprint_gain, harmonics, bw_frac, floor_db, sharpness = 8.0, 10, 0.01, -18.0, 12
 
-    # Build Focus/imprint/low‑end configs for generation
-    focus_params = dict(
-        preset=focus_preset if focus_preset != "none" else None, band=band
-    )
-    imprint_params = dict(
-        gain=locals().get("imprint_gain", 8.0),
-        harmonics=locals().get("harmonics", 10),
-        bw_frac=locals().get("bw_frac", 0.01),
-        floor_db=locals().get("floor_db", -18.0),
-        sharpness=locals().get("sharpness", 12),
-        n_fft=2048,
-    )
-    # Defaults while advanced controls are hidden
-    hpf_taps = 2049  # Steep by default
-    lowend_cfg = dict(
-        tame_low_end=bool(tame_low_end),
-        hpf_cutoff_hz=25,
-        hpf_taps=int(hpf_taps),
-        mono_lows=True,
-        mono_cutoff_hz=120,
-    )
-
 with right:
     # Reserve a container at the top for Generate so it's visually above
     gen_top = st.container()
@@ -842,17 +817,19 @@ with right:
                 seed_val_local,
                 output_suffix,
             )
-            prompt_only_name_local = f"{base_stem_local}_prompt_scale-{melody_scale if enable_melody else 'none'}_root-{melody_root}_focus-"
-            if enable_focus:
-                if focus_params.get("preset"):
-                    prompt_only_name_local += f"{focus_params['preset']}"
-                elif band:
-                    prompt_only_name_local += f"band-{int(band[0])}-{int(band[1])}"
-                else:
-                    prompt_only_name_local += "custom"
-            else:
-                prompt_only_name_local += "none"
-            prompt_only_name_local += f"_seed-{seed_val_local}.wav"
+            focus_tag = (
+                focus_params["preset"]
+                if enable_focus and focus_params.get("preset")
+                else f"band-{int(band[0])}-{int(band[1])}"
+                if enable_focus and band
+                else "custom"
+                if enable_focus
+                else "none"
+            )
+            prompt_only_name_local = (
+                f"{base_stem_local}_prompt_scale-{melody_scale if enable_melody else 'none'}"
+                f"_root-{melody_root}_focus-{focus_tag}_seed-{seed_val_local}.wav"
+            )
 
             # Prompt audio + download (render below in this column)
             # Reuse cached prompt bytes if parameters unchanged
@@ -1000,6 +977,7 @@ with right:
                 unsafe_allow_html=True,
             )
 
+st.markdown("</div>", unsafe_allow_html=True)
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
 st.markdown(

@@ -1,11 +1,11 @@
 [logger]
 # Verbosity for Streamlit internals and your print/log output
-level = "debug"
+level = "info"
 messageFormat = "%(asctime)s %(levelname)s %(message)s"
 
 [client]
 # Show full tracebacks in the browser to aid debugging
-showErrorDetails = "full"
+showErrorDetails = "minimal"
 toolbarMode = "developer"
 
 [runner]

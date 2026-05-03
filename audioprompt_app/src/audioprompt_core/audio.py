@@ -29,7 +29,7 @@ def _as_readable(file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO, obje
 def _is_mp3_name_or_type(obj: object) -> bool:
     name = getattr(obj, "name", "") or str(obj)
     mtype = getattr(obj, "type", "")
-    return str(name).lower().endswith(".mp3") or ("mpeg" in str(mtype).lower() or "mp3" in str(mtype).lower())
+    return str(name).lower().endswith(".mp3") or "mpeg" in str(mtype).lower() or "mp3" in str(mtype).lower()
 
 
 def _mp3_supported() -> bool:

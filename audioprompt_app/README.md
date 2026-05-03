@@ -21,16 +21,16 @@ Supported formats
 - Output: WAV (PCM16).
 
 UI Layout & Features
-Left column (Controls)
+Top row
+- Quick Start: Overview and instructions.
 - Input & Output
   - Input audio (optional): Drag and drop a file (styled drop zone). If provided, the prompt is prepended to create a combined output.
   - Sample rate: Default 48000 Hz. All processing runs at this rate; inputs are resampled.
-- Toggles
+
+Left column (Controls)
+- Melody
   - Enable melody: Imprint a randomized melody (scale‑constrained) onto pink noise.
-  - Enable focus band: Emphasize energy in a preset band (vocal/guitar/bass) or a custom Hz range.
   - Enable rhythmic gate: Apply a syllabic/phrase‑like amplitude envelope from the melody events.
-- Prompt seconds: Duration of the generated prompt (also used for prepend length).
-- Melody (when enabled)
   - Root, Scale: Choose any from the built‑in list (includes minor_blues, pentatonic, modes, etc.).
   - BPM: Tempo used for randomized event durations.
   - Range (Low/High MIDI): Register for the melody notes.
@@ -38,22 +38,24 @@ Left column (Controls)
   - Rest prob: Fraction of time devoted to rests.
   - Glide prob/frac: Probability and portion of each note gliding toward the next.
   - Vibrato Hz/Depth: Subtle expressive pitch modulation.
- 
-Right column (Focus, Output & Generate, Outputs)
+  - Timbre preset, Mask shape, Detune: Change the texture of the imprinted melody.
 - Focus (optional)
+  - Enable focus band: Emphasize energy in a preset band (vocal/guitar/bass) or a custom Hz range.
+  - Bass Roll‑Off: Removes sub‑bass rumble.
   - Preset: vocal (≈120–3200 Hz), guitar (≈80–6000 Hz), bass (≈40–300 Hz), or custom.
   - Custom band: Twin‑handle Hz slider for low/high cutoff.
-  - Imprint gain: Strength of harmonic emphasis around the melody’s partials.
-  - Harmonics: Number of harmonics in the emphasis mask.
-  - BW frac: Fractional bandwidth of harmonic peaks (smaller = sharper pitch focus).
-  - Band floor (dB): Attenuation outside the focused band.
-  - Band edge sharpness: Steepness of the band edges.
-- Output & Seed
-  - Prompt gain (dB): Level applied when prepending to the input track.
-  - Fade‑in/out (ms): Smooth start/end on the prepended prompt segment.
-  - Seed: Controls randomness for pink noise and melody generation. Default is -1 (new random seed each generation). Set to a fixed integer for reproducible results.
-- Generate & Outputs
+  - Advanced: Imprint gain, Harmonics, BW frac, Band floor, Band edge sharpness.
+
+Right column (Generate, Output & Outputs)
+- Generate
   - Generate Prompt button
+  - Seed: Controls randomness for pink noise and melody generation. Default is -1 (new random seed each generation). Set to a fixed integer for reproducible results.
+- Output
+  - Prompt seconds: Duration of the generated prompt (also used for prepend length).
+  - Prompt gain (dB): Level applied when prepending to the input track.
+  - Auto gain: Match prompt loudness to input audio RMS.
+  - Fade‑in/out (ms): Smooth start/end on the prepended prompt segment.
+- Outputs
   - Prompt: In‑page audio player and “Download prompt” button.
   - Combined: In‑page audio player and “Download combined” button (enabled if an input file is uploaded).
   - Status messages: Informative notes when only prompt is generated or if format issues occur.
