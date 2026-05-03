@@ -33,6 +33,7 @@ from audioprompt_core.melody import (
 )
 from audioprompt_core.mididrums import (
     parse_midi_drum_events,
+    scale_lane_events,
     LANES,
 )
 from audioprompt_core.drumnoise import (
@@ -467,8 +468,20 @@ with left:
             "hat": hat_gain,
             "perc": perc_gain,
         }
+        drum_speed_mult = st.slider(
+            "Drum speed",
+            0.25,
+            2.0,
+            1.0,
+            0.05,
+            help=(
+                "Time-scale the drum groove. <1.0 = slower (lower effective BPM), "
+                ">1.0 = faster. Does not change pitch (just timing)."
+            ),
+        )
     else:
         drum_lane_gains = {"kick": 1.0, "snare": 0.9, "hat": 0.7, "perc": 0.5}
+        drum_speed_mult = 1.0
 
     # Add ~36px top margin before Focus header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -697,6 +710,9 @@ with right:
                     try:
                         drum_lanes, drum_bpm = parse_midi_drum_events(drum_midi_file.getvalue())
                         _log_debug(f"[gen] drum MIDI parsed: {drum_bpm} BPM")
+                        if float(drum_speed_mult) != 1.0:
+                            drum_lanes = scale_lane_events(drum_lanes, float(drum_speed_mult))
+                            _log_debug(f"[gen] drum speed scaled by {drum_speed_mult:.2f}x")
                         y_drum = synthesize_drum_layer(
                             drum_lanes,
                             sr=int(sr),
@@ -706,7 +722,7 @@ with right:
                             master_gain=1.0,  # full-level; blend gain applied at render time
                         )
                         st.session_state["y_drum"] = y_drum
-                        st.session_state["drum_bpm"] = drum_bpm
+                        st.session_state["drum_bpm"] = round(float(drum_bpm) * float(drum_speed_mult), 1)
                         _log_debug(f"[gen] drum layer: len={len(y_drum)}, peak={np.max(np.abs(y_drum)):.4f}")
                     except Exception as e:
                         _log_debug(f"[gen] drum error: {e}")
@@ -781,6 +797,7 @@ with right:
                 bool(enable_drum),
                 round(float(melody_blend_gain), 3),
                 round(float(drum_blend_gain), 3),
+                round(float(drum_speed_mult), 3),
             )
             if st.session_state.get("prompt_key") != prompt_key_now or "prompt_bytes" not in st.session_state:
                 prompt_wav_local = wav_bytes(y_render, sr_prompt_local)

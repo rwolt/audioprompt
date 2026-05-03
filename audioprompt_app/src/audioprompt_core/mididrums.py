@@ -189,6 +189,27 @@ def parse_midi_drum_events(
     return lanes, bpm
 
 
+def scale_lane_events(
+    lanes: Dict[str, List[Tuple[float, float, int]]],
+    speed_mult: float,
+) -> Dict[str, List[Tuple[float, float, int]]]:
+    """Scale event start times and durations by a speed multiplier.
+
+    speed_mult > 1.0  => faster (higher effective BPM, shorter times)
+    speed_mult < 1.0  => slower (lower effective BPM, longer times)
+    speed_mult = 1.0  => no change
+
+    Returns a new dict with scaled events; original is unmodified.
+    """
+    if speed_mult == 1.0:
+        return lanes
+    result: Dict[str, List[Tuple[float, float, int]]] = {}
+    for lane, events in lanes.items():
+        result[lane] = [
+            (start_s / speed_mult, duration_s / speed_mult, vel)
+            for (start_s, duration_s, vel) in events
+        ]
+    return result
 def summarize_drum_lanes(lanes: Dict[str, List[Tuple[float, float, int]]]) -> dict:
     """Return a human-readable summary of lane contents."""
     summary = {}
