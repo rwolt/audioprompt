@@ -18,7 +18,7 @@ def _rms_dbfs(y: np.ndarray) -> float:
 # Import core from ./src (ensure our local package takes precedence)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 # Import directly from submodules to avoid package-level side effects
-from audioprompt_core.audio import load_audio_mono, apply_fades, wav_bytes, wav_bytes_concat_segments, tag_suffix
+from audioprompt_core.audio import load_audio_mono, apply_fades, wav_bytes, wav_bytes_concat_segments
 from audioprompt_core.prompt import (
     pink_noise,
     imprint_melody_focus,
@@ -37,6 +37,7 @@ from audioprompt_core.mididrums import (
     LANES,
 )
 from audioprompt_core.drumnoise import (
+    build_drum_tone_params,
     synthesize_drum_layer,
 )
 
@@ -114,6 +115,77 @@ def _upload_signature(uploaded_file):
     if uploaded_file is None:
         return None
     return (getattr(uploaded_file, "name", None), getattr(uploaded_file, "size", None))
+
+
+def _slug(value: object) -> str:
+    text = str(value).lower().replace("_", "-").replace(" ", "-")
+    keep = []
+    last_dash = False
+    for ch in text:
+        if ch.isalnum():
+            keep.append(ch)
+            last_dash = False
+        elif ch == "-" and keep and not last_dash:
+            keep.append(ch)
+            last_dash = True
+    return "".join(keep).strip("-") or "none"
+
+
+def _root_tag(root: object) -> str:
+    text = str(root)
+    return text.lower().replace("#", "s").replace("b", "b")
+
+
+def _scale_tag(scale: str, enabled: bool) -> str:
+    if not enabled:
+        return "none"
+    aliases = {
+        "natural_minor": "natmin",
+        "harmonic_minor": "harmmin",
+        "melodic_minor": "melmin",
+        "minor_pentatonic": "minpent",
+        "major_pentatonic": "majpent",
+        "minor_blues": "minblues",
+        "major_blues": "majblues",
+        "octatonic_whole_half": "octwh",
+        "octatonic_half_whole": "octhw",
+        "whole_tone": "whole",
+        "double_harmonic": "dblharm",
+        "harmonic_major": "harmaj",
+    }
+    return aliases.get(scale, _slug(scale))
+
+
+def _focus_tag(enabled: bool, preset: str | None, focus_band) -> str:
+    if not enabled:
+        return "none"
+    aliases = {"vocal": "voc", "guitar": "gtr", "bass": "bass"}
+    if preset:
+        return aliases.get(str(preset), _slug(preset))
+    if focus_band is not None:
+        return f"b{int(focus_band[0])}-{int(focus_band[1])}"
+    return "custom"
+
+
+def _download_name(kind: str, base_stem: str | None, meta: dict) -> str:
+    prefix = _slug(base_stem) if base_stem else "ap"
+    parts = [
+        prefix,
+        kind,
+        f"r-{_root_tag(meta.get('root', 'none'))}",
+        f"s-{meta.get('scale', 'none')}",
+        f"ms-{meta.get('melody_seed', 'none')}",
+    ]
+    drum_seed = meta.get("drum_seed")
+    if drum_seed is not None:
+        parts.append(f"ds-{drum_seed}")
+    focus = meta.get("focus", "none")
+    if focus != "none":
+        parts.append(f"f-{focus}")
+    character = meta.get("character", "neutral")
+    if character != "neutral":
+        parts.append(f"ch-{_slug(character)}")
+    return "_".join(parts) + ".wav"
 st.markdown(
     """
     <style>
@@ -221,6 +293,7 @@ def build_prompt(
     enable_gate: bool,
     imprint_params: dict,
     lowend_cfg: dict | None = None,
+    character_params: dict | None = None,
 ):
     n = int(sr * prompt_seconds)
     x_pink = pink_noise(n, sr, seed=seed)
@@ -277,6 +350,9 @@ def build_prompt(
             band_floor_db=imprint_params["floor_db"],
             sharpness=imprint_params["sharpness"],
             n_fft=int(imprint_params["n_fft"]),
+            character=(character_params or {}).get("character", "neutral"),
+            note_shape=(character_params or {}).get("note_shape", "natural"),
+            detune_spread_cents=float((character_params or {}).get("detune_spread_cents", 0.0)),
         )
     elif enable_focus:
         y_prompt = imprint_melody_focus(
@@ -295,7 +371,15 @@ def build_prompt(
         y_prompt = x_pink.astype(np.float32)
 
     if enable_gate and events is not None:
-        gate = rhythmic_gate_from_events(events, sr, n_samples=n, attack=0.01, release=0.03)
+        shape = (character_params or {}).get("note_shape", "natural")
+        gate_shapes = {
+            "tight": (0.004, 0.018),
+            "pluck": (0.002, 0.012),
+            "smooth": (0.02, 0.08),
+            "natural": (0.01, 0.03),
+        }
+        attack, release = gate_shapes.get(shape, gate_shapes["natural"])
+        gate = rhythmic_gate_from_events(events, sr, n_samples=n, attack=attack, release=release)
         y_prompt = (y_prompt * (0.15 + 0.85 * gate)).astype(np.float32)
 
     # Normalize
@@ -315,7 +399,7 @@ with top_left:
 
         1. Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only (a simple 1–2 bar drum loop works great as a starting point).
         2. Set Prompt seconds and choose Melody settings (root/scale/BPM).
-        3. Use Focus (or Custom band) and enable Tame Low End for cleaner results.
+        3. Use Focus (or Custom band) and enable Bass Roll-Off for cleaner prompt starts.
         4. Click Generate Prompt. Preview the Prompt, and if input audio is provided, the Combined result. Download the tagged WAVs.
 
         Tips: 3–6 s prompts give a clear steer without masking; “Vocal” focus often helps melody “speak”.
@@ -406,6 +490,28 @@ with left:
         with col2:
             vib_hz = st.slider("Vibrato Hz", 3.0, 9.0, 5.5, 0.1, help="Rate of pitch modulation.")
         vib_depth = st.slider("Vibrato depth", 0.0, 0.05, 0.02, 0.001, help="Depth of pitch modulation (fraction).")
+        ccol1, ccol2 = st.columns(2, gap="small")
+        with ccol1:
+            melody_character = st.selectbox(
+                "Melody character",
+                options=["neutral", "warm", "voice", "reed", "bell", "pluck", "bright", "wide"],
+                index=0,
+                help=(
+                    "Changes the harmonic balance of the melody imprint. "
+                    "Use voice/reed/bell/pluck for instrument-like colors, bright for more edge, "
+                    "or wide for a subtle doubled-mask thickness."
+                ),
+            )
+        with ccol2:
+            note_shape = st.selectbox(
+                "Note shape",
+                options=["natural", "tight", "pluck", "smooth"],
+                index=0,
+                help=(
+                    "Shapes how strongly each melody note appears in the noise. "
+                    "Tight and pluck are shorter; smooth has a softer envelope."
+                ),
+            )
 
         with st.expander("Melody – Advanced", expanded=False):
             colA1, colA2 = st.columns(2, gap="small")
@@ -427,6 +533,7 @@ with left:
         step_bias, leap_steps, rest_prob = 0.5, 7, 0.12
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
+        melody_character, note_shape = "neutral", "natural"
 
     # Add ~36px top margin before Drum header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -468,6 +575,34 @@ with left:
             "hat": hat_gain,
             "perc": perc_gain,
         }
+        dt1, dt2 = st.columns(2, gap="small")
+        with dt1:
+            drum_character = st.selectbox(
+                "Drum character",
+                options=["clean", "tight", "deep", "bright", "breakbeat"],
+                index=0,
+                help=(
+                    "Applies a small set of lane tone/envelope presets. "
+                    "Breakbeat adds body, snap, and light saturation while keeping the MIDI groove."
+                ),
+            )
+            snare_tune = st.slider(
+                "Snare tune",
+                -12,
+                12,
+                0,
+                1,
+                help="Shifts the snare lane's noise band in semitones before the drum layer is synthesized.",
+            )
+        with dt2:
+            drum_decay = st.slider(
+                "Drum decay",
+                0.5,
+                1.8,
+                1.0,
+                0.05,
+                help="Shortens or lengthens all drum lane envelopes. Lower values are tighter; higher values ring longer.",
+            )
         drum_speed_mult = st.slider(
             "Drum speed",
             0.25,
@@ -482,6 +617,7 @@ with left:
     else:
         drum_lane_gains = {"kick": 1.0, "snare": 0.9, "hat": 0.7, "perc": 0.5}
         drum_speed_mult = 1.0
+        drum_character, snare_tune, drum_decay = "clean", 0, 1.0
 
     # Add ~36px top margin before Focus header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -498,7 +634,10 @@ with left:
         tame_low_end = st.checkbox(
             "Bass Roll-Off",
             value=True,
-            help="Removes sub-bass rumble for cleaner starts and more headroom.",
+            help=(
+                "Applies a 25 Hz high-pass filter to the generated prompt noise before melody/focus imprinting. "
+                "This removes sub-bass rumble from the prompt layer only; it does not EQ your uploaded audio."
+            ),
         )
     if enable_focus:
         focus_preset = st.radio(
@@ -563,8 +702,6 @@ with right:
     # Reserve a container at the top for Generate so it's visually above
     gen_top = st.container()
 
-    # Seed control moved next to Generate button
-    output_suffix = "_with_prompt"
     # Collect params for generation
     melody_params = dict(
         bpm=bpm,
@@ -581,6 +718,11 @@ with right:
         glide_frac=glide_frac,
         vib_hz=float(vib_hz),
         vib_depth=float(vib_depth),
+    )
+    character_params = dict(
+        character="neutral" if melody_character == "wide" else melody_character,
+        note_shape=note_shape,
+        detune_spread_cents=7.0 if melody_character == "wide" else 0.0,
     )
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
     imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
@@ -694,6 +836,7 @@ with right:
                     enable_gate=bool(enable_gate),
                     imprint_params=imprint_params,
                     lowend_cfg=lowend_cfg,
+                    character_params=character_params,
                 )
                 # If neither melody nor focus is on, silence the melody layer
                 # so drum-only output is truly just the drum layer.
@@ -706,20 +849,30 @@ with right:
                 _log_debug(f"[gen] melody prompt_len={len(y_prompt)} samples @ {int(sr)} Hz; mem_after={_mem_usage_mb()} MB")
 
                 # Drum MIDI prompt
+                drum_seed_used = None
                 if enable_drum and drum_midi_file is not None:
                     try:
+                        drum_seed_used = seed_to_use + 1
                         drum_lanes, drum_bpm = parse_midi_drum_events(drum_midi_file.getvalue())
                         _log_debug(f"[gen] drum MIDI parsed: {drum_bpm} BPM")
                         if float(drum_speed_mult) != 1.0:
                             drum_lanes = scale_lane_events(drum_lanes, float(drum_speed_mult))
                             _log_debug(f"[gen] drum speed scaled by {drum_speed_mult:.2f}x")
+                        drum_lane_params, drum_drive = build_drum_tone_params(
+                            drum_character,
+                            sr=int(sr),
+                            snare_tune_semitones=float(snare_tune),
+                            decay_mult=float(drum_decay),
+                        )
                         y_drum = synthesize_drum_layer(
                             drum_lanes,
                             sr=int(sr),
                             prompt_seconds=float(prompt_seconds),
-                            seed=seed_to_use + 1,  # correlated but not identical
+                            seed=drum_seed_used,  # correlated but not identical
                             lane_gains=drum_lane_gains,
+                            lane_params=drum_lane_params,
                             master_gain=1.0,  # full-level; blend gain applied at render time
+                            drive=drum_drive,
                         )
                         st.session_state["y_drum"] = y_drum
                         st.session_state["drum_bpm"] = round(float(drum_bpm) * float(drum_speed_mult), 1)
@@ -728,9 +881,22 @@ with right:
                         _log_debug(f"[gen] drum error: {e}")
                         st.error(f"Failed to parse drum MIDI. Make sure you uploaded a valid .mid/.midi file.\nError: {e}")
                         st.session_state.pop("y_drum", None)
+                        drum_seed_used = None
                 else:
                     st.session_state.pop("y_drum", None)
                     st.session_state.pop("drum_bpm", None)
+                st.session_state["download_meta"] = {
+                    "root": melody_root if enable_melody else "none",
+                    "scale": _scale_tag(melody_scale, bool(enable_melody)),
+                    "melody_seed": seed_to_use,
+                    "drum_seed": drum_seed_used,
+                    "focus": _focus_tag(
+                        bool(enable_focus),
+                        focus_params.get("preset"),
+                        band if focus_params.get("preset") is None else None,
+                    ),
+                    "character": melody_character,
+                }
 
         # Outputs header
         st.subheader("Outputs")
@@ -759,29 +925,23 @@ with right:
 
             # File naming for prompt/combined
             seed_val_local = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
-            base_stem_local = Path(uploaded.name).stem if uploaded is not None else "prompt"
-            suffix_local = tag_suffix(
-                enable_melody,
-                melody_scale,
-                enable_focus,
-                focus_params.get("preset"),
-                band if focus_params.get("preset") is None else None,
-                seed_val_local,
-                output_suffix,
-                enable_drum=enable_drum,
+            base_stem_local = Path(uploaded.name).stem if uploaded is not None else None
+            download_meta = st.session_state.get(
+                "download_meta",
+                {
+                    "root": melody_root if enable_melody else "none",
+                    "scale": _scale_tag(melody_scale, bool(enable_melody)),
+                    "melody_seed": seed_val_local,
+                    "drum_seed": seed_val_local + 1 if "y_drum" in st.session_state else None,
+                    "focus": _focus_tag(
+                        bool(enable_focus),
+                        focus_params.get("preset"),
+                        band if focus_params.get("preset") is None else None,
+                    ),
+                    "character": melody_character,
+                },
             )
-            prompt_only_name_local = f"{base_stem_local}_prompt_scale-{melody_scale if enable_melody else 'none'}_root-{melody_root}_focus-"
-            if enable_focus:
-                if focus_params.get("preset"):
-                    prompt_only_name_local += f"{focus_params['preset']}"
-                elif band:
-                    prompt_only_name_local += f"band-{int(band[0])}-{int(band[1])}"
-                else:
-                    prompt_only_name_local += "custom"
-            else:
-                prompt_only_name_local += "none"
-            drum_tag = "drum" if enable_drum else "nodrum"
-            prompt_only_name_local += f"_drum-{drum_tag}_seed-{seed_val_local}.wav"
+            prompt_only_name_local = _download_name("prompt", base_stem_local, download_meta)
 
             # Prompt audio + download (render below in this column)
             # Reuse cached prompt bytes if parameters unchanged
@@ -862,6 +1022,9 @@ with right:
                         int(fade_in_ms), int(fade_out_ms),
                         getattr(uploaded, "name", None), getattr(uploaded, "size", None),
                         bool(enable_drum),
+                        round(float(melody_blend_gain), 3),
+                        round(float(drum_blend_gain), 3),
+                        round(float(drum_speed_mult), 3),
                     )
                     if st.session_state.get("combined_key") != combined_key_now or "combined_bytes" not in st.session_state:
                         combined_wav_local = wav_bytes_concat_segments([prompt_local, x_local.astype(np.float32, copy=False)], int(sr))
@@ -877,7 +1040,7 @@ with right:
                     with cap_col_audio:
                         st.audio(combined_wav_local, format="audio/wav")
                     with cap_col_btn:
-                        combined_name_local = f"{Path(uploaded.name).stem}{suffix_local}_root-{melody_root}.wav"
+                        combined_name_local = _download_name("combined", Path(uploaded.name).stem, download_meta)
                         st.download_button(
                             "Download Combined",
                             data=combined_wav_local,

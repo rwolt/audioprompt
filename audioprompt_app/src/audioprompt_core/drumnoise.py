@@ -59,8 +59,9 @@ def _band_limited_pink_noise(
 
     # Bandpass via FIR (linear phase with filtfilt for zero-phase)
     nyq = sr / 2.0
-    lo = max(10.0, min(low_hz, nyq - 1))
-    hi = max(lo + 1, min(high_hz, nyq))
+    hi_limit = max(11.0, nyq - 1.0)
+    lo = max(10.0, min(low_hz, hi_limit - 1.0))
+    hi = max(lo + 1.0, min(high_hz, hi_limit))
     taps = int(taps) if taps % 2 == 1 else int(taps + 1)
     # Use transition bandwidth relative to center freq
     tbw = min(abs(hi - lo) * 0.15, hi * 0.3, nyq * 0.4)
@@ -74,6 +75,67 @@ def _band_limited_pink_noise(
     )
     y = filtfilt(b, [1.0], y).astype(np.float32)
     return y
+
+
+def _shift_band(low_hz: float, high_hz: float, semitones: float, sr: int) -> tuple[float, float]:
+    factor = 2.0 ** (float(semitones) / 12.0)
+    nyq = sr / 2.0
+    lo = max(10.0, min(low_hz * factor, nyq - 2.0))
+    hi = max(lo + 1.0, min(high_hz * factor, nyq - 1.0))
+    return lo, hi
+
+
+def build_drum_tone_params(
+    character: str,
+    *,
+    sr: int,
+    snare_tune_semitones: float = 0.0,
+    decay_mult: float = 1.0,
+) -> tuple[Dict[str, dict], float]:
+    """Return lane overrides and drive amount for musician-facing drum characters."""
+    lane_params: Dict[str, dict] = {}
+    drive = 0.0
+
+    if character == "tight":
+        lane_params = {
+            "kick": {"decay_s": 0.24, "high_hz": 170.0},
+            "snare": {"decay_s": 0.11, "high_hz": 2600.0},
+            "hat": {"decay_s": 0.025, "low_hz": 6500.0},
+            "perc": {"decay_s": 0.08, "high_hz": 4800.0},
+        }
+    elif character == "deep":
+        lane_params = {
+            "kick": {"low_hz": 24.0, "high_hz": 150.0, "decay_s": 0.48},
+            "snare": {"low_hz": 120.0, "high_hz": 2600.0, "decay_s": 0.22},
+            "hat": {"low_hz": 4200.0, "high_hz": 13000.0},
+            "perc": {"low_hz": 150.0, "high_hz": 4200.0, "decay_s": 0.16},
+        }
+    elif character == "bright":
+        lane_params = {
+            "kick": {"high_hz": 260.0},
+            "snare": {"low_hz": 180.0, "high_hz": 5200.0},
+            "hat": {"low_hz": 6500.0, "high_hz": 18000.0},
+            "perc": {"high_hz": 8000.0},
+        }
+    elif character == "breakbeat":
+        lane_params = {
+            "kick": {"low_hz": 28.0, "high_hz": 230.0, "attack_s": 0.0015, "decay_s": 0.38},
+            "snare": {"low_hz": 135.0, "high_hz": 4300.0, "attack_s": 0.0008, "decay_s": 0.2},
+            "hat": {"low_hz": 5200.0, "high_hz": 15000.0, "decay_s": 0.055},
+            "perc": {"low_hz": 180.0, "high_hz": 6500.0, "decay_s": 0.14},
+        }
+        drive = 0.18
+
+    for lane_name, defaults in LANE_DEFAULTS.items():
+        params = {**defaults, **lane_params.get(lane_name, {})}
+        params["decay_s"] = max(0.005, float(params["decay_s"]) * float(decay_mult))
+        if lane_name == "snare" and snare_tune_semitones:
+            params["low_hz"], params["high_hz"] = _shift_band(
+                params["low_hz"], params["high_hz"], snare_tune_semitones, sr
+            )
+        lane_params[lane_name] = params
+
+    return lane_params, drive
 
 
 def _hit_envelope(hit_len: int, attack_n: int, decay_n: int) -> np.ndarray:
@@ -168,6 +230,7 @@ def synthesize_drum_layer(
     lane_gains: Dict[str, float] | None = None,
     lane_params: Dict[str, dict] | None = None,
     master_gain: float = 1.0,
+    drive: float = 0.0,
 ) -> np.ndarray:
     """Synthesize a drum prompt from parsed MIDI lane events.
 
@@ -234,6 +297,9 @@ def synthesize_drum_layer(
 
     if master_gain != 1.0:
         combined *= master_gain
+    if drive > 0.0:
+        amount = 1.0 + 8.0 * float(drive)
+        combined = np.tanh(combined * amount) / np.tanh(amount)
 
     peak = float(np.max(np.abs(combined)) + 1e-12)
     if peak > 1.0:

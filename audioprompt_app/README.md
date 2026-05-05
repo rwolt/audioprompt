@@ -33,6 +33,8 @@ Left column (Controls)
 - Melody (when enabled)
   - Root, Scale: Choose any from the built-in list (includes minor_blues, pentatonic, modes, etc.).
   - BPM: Tempo used for randomized event durations. If you also uploaded a Drum MIDI, match this BPM to the drum track.
+  - Melody character: Simple harmonic-color presets for the imprinted melody. Voice/reed/bell/pluck/bright/wide change the tone without exposing low-level mask settings.
+  - Note shape: Sets the rhythmic envelope feel for imprinted notes. Tight and pluck are shorter; smooth is softer and more legato.
   - Range (Low/High MIDI): Register for the melody notes.
   - Step bias / Max leap: Controls stepwise motion vs. larger interval jumps.
   - Rest prob: Fraction of time devoted to rests.
@@ -41,6 +43,9 @@ Left column (Controls)
 - Drum MIDI Imprint (when enabled)
   - Drum MIDI (.mid / .midi): Upload a General MIDI drum track.
   - Per-lane gains: Kick, Snare, Hat, Perc amounts.
+  - Drum character: Clean, tight, deep, bright, or breakbeat lane presets. These shift lane bands, decay, and light drive under the hood.
+  - Snare tune: Shifts the snare noise band by semitones before synthesis, so the snare can sit lower or higher without changing MIDI note mapping.
+  - Drum decay: Global envelope length for the drum layer. Lower values are tighter; higher values ring longer.
 - Focus (when enabled)
   - Preset: vocal (approximately 120-3200 Hz), guitar (approximately 80-6000 Hz), bass (approximately 40-300 Hz), or custom.
   - Custom band: Twin-handle Hz slider for low/high cutoff.
@@ -65,9 +70,10 @@ Right column (Output & Seed, Layer Blend, Generate, Outputs)
   - Status messages: Informative notes when only prompt is generated or if format issues occur.
 
 Filename tagging
-- Output names include scale, focus, drum, and seed to avoid overwrites and track settings.
-  - Combined: <input_stem>_with_prompt_scale-<scale|none>_focus-<preset|band-lo-hi|none>_drum-<drum|nodrum>_seed-<seed>.wav
-  - Prompt only: <input_stem>_prompt_scale-<...>_focus-<...>_drum-<drum|nodrum>_seed-<seed>.wav (or "prompt_..." if no input file).
+- Output names use compact tags for the most important generation settings.
+  - Prompt only: ap_prompt_r-e_s-minpent_ms-1234_ds-1235.wav
+  - Combined: my-song-take-1_combined_r-e_s-minpent_ms-1234_ds-1235.wav
+  - Tags: r = root, s = scale, ms = melody/noise seed, ds = drum seed. Focus appears only when enabled, e.g. f-voc or f-b120-3200. Character appears only when non-neutral, e.g. ch-voice.
 
 MIDI Drum Map (General MIDI -> lanes)
 | Note | Lane | Description |
@@ -84,6 +90,7 @@ MIDI Drum Map (General MIDI -> lanes)
 Drum MIDI Imprint notes
 - Each lane (kick / snare / hat / perc) is generated from band-limited pink noise with velocity-sensitive envelopes.
 - Velocity controls both loudness and decay time: ghost notes (low velocity) are softer and shorter; hard hits (high velocity) are louder and longer.
+- Drum character controls are deliberately compact: they prove tone/tuning/decay control without adding a full synthesizer panel.
 - Use the Layer Blend sliders to balance melody level vs. drum level.
 - For drums-only output: disable Melody and Focus, enable Drum MIDI Imprint, and click Generate.
 
@@ -96,10 +103,11 @@ Performance & Limits
 How it works (core pieces)
 - Pink noise: 1/sqrt(f) spectrum generated in the frequency domain.
 - Melody imprint: STFT magnitude shaped by time-varying harmonic masks built from an f0 trajectory.
+- Melody character: musician-facing presets alter harmonic weights, note envelope shape, and optional doubled-mask spread.
 - Randomized melody: scale-constrained note events with step/leap/rest behavior and optional glides.
 - Focus band: global EQ mask in log-frequency with soft edges and outside-band floor.
 - Gate: time-domain envelope matched to note onsets/offsets.
-- Drum MIDI Imprint: parses MIDI note events, maps them to lanes, generates band-limited pink noise per lane, and applies velocity-sensitive AD envelopes.
+- Drum MIDI Imprint: parses MIDI note events, maps them to lanes, generates band-limited pink noise per lane, applies velocity-sensitive AD envelopes, then applies compact tone/tune/decay presets.
 
 Troubleshooting
 - "Failed to read input audio": Convert to WAV/FLAC/OGG; ensure the app has file read permission.
