@@ -34,6 +34,7 @@ from audioprompt_core.melody import (
 from audioprompt_core.mididrums import (
     parse_midi_drum_events,
     scale_lane_events,
+    loop_lane_events,
     LANES,
 )
 from audioprompt_core.drumnoise import (
@@ -546,6 +547,9 @@ with left:
     )
     drum_midi_file = None
     drum_lane_gains = {}
+    drum_bpm = int(bpm)
+    match_melody_bpm = True
+    loop_drums = True
     if enable_drum:
         drum_midi_file = st.file_uploader(
             "Drum MIDI (.mid / .midi)",
@@ -603,20 +607,36 @@ with left:
                 0.05,
                 help="Shortens or lengthens all drum lane envelopes. Lower values are tighter; higher values ring longer.",
             )
-        drum_speed_mult = st.slider(
-            "Drum speed",
-            0.25,
-            2.0,
-            1.0,
-            0.05,
+        tempo1, tempo2 = st.columns(2, gap="small")
+        with tempo1:
+            match_melody_bpm = st.checkbox(
+                "Match melody BPM",
+                value=True,
+                help="Use the melody BPM for the drum layer. Turn off to set an independent drum BPM.",
+            )
+        with tempo2:
+            drum_bpm = st.slider(
+                "Drum BPM",
+                40,
+                220,
+                int(bpm),
+                1,
+                disabled=match_melody_bpm,
+                help=(
+                    "Target BPM for the uploaded drum MIDI. The app reads the MIDI tempo, "
+                    "then time-scales the drum events to this BPM."
+                ),
+            )
+        loop_drums = st.checkbox(
+            "Loop drums to prompt length",
+            value=True,
             help=(
-                "Time-scale the drum groove. <1.0 = slower (lower effective BPM), "
-                ">1.0 = faster. Does not change pitch (just timing)."
+                "Repeat the uploaded drum MIDI until it fills Prompt seconds. "
+                "Turn off if the MIDI file is already arranged for the full prompt."
             ),
         )
     else:
         drum_lane_gains = {"kick": 1.0, "snare": 0.9, "hat": 0.7, "perc": 0.5}
-        drum_speed_mult = 1.0
         drum_character, snare_tune, drum_decay = "clean", 0, 1.0
 
     # Add ~36px top margin before Focus header for clearer separation
@@ -853,11 +873,18 @@ with right:
                 if enable_drum and drum_midi_file is not None:
                     try:
                         drum_seed_used = seed_to_use + 1
-                        drum_lanes, drum_bpm = parse_midi_drum_events(drum_midi_file.getvalue())
-                        _log_debug(f"[gen] drum MIDI parsed: {drum_bpm} BPM")
-                        if float(drum_speed_mult) != 1.0:
+                        drum_lanes, detected_drum_bpm = parse_midi_drum_events(drum_midi_file.getvalue())
+                        target_drum_bpm = float(bpm) if match_melody_bpm else float(drum_bpm)
+                        drum_speed_mult = target_drum_bpm / max(float(detected_drum_bpm), 1e-6)
+                        _log_debug(
+                            f"[gen] drum MIDI parsed: {detected_drum_bpm} BPM; target={target_drum_bpm:.1f} BPM"
+                        )
+                        if abs(float(drum_speed_mult) - 1.0) > 1e-6:
                             drum_lanes = scale_lane_events(drum_lanes, float(drum_speed_mult))
-                            _log_debug(f"[gen] drum speed scaled by {drum_speed_mult:.2f}x")
+                            _log_debug(f"[gen] drum BPM scaled by {drum_speed_mult:.3f}x")
+                        if loop_drums:
+                            drum_lanes = loop_lane_events(drum_lanes, float(prompt_seconds))
+                            _log_debug("[gen] drum events looped to prompt length")
                         drum_lane_params, drum_drive = build_drum_tone_params(
                             drum_character,
                             sr=int(sr),
@@ -875,7 +902,8 @@ with right:
                             drive=drum_drive,
                         )
                         st.session_state["y_drum"] = y_drum
-                        st.session_state["drum_bpm"] = round(float(drum_bpm) * float(drum_speed_mult), 1)
+                        st.session_state["drum_bpm"] = round(float(target_drum_bpm), 1)
+                        st.session_state["detected_drum_bpm"] = round(float(detected_drum_bpm), 1)
                         _log_debug(f"[gen] drum layer: len={len(y_drum)}, peak={np.max(np.abs(y_drum)):.4f}")
                     except Exception as e:
                         _log_debug(f"[gen] drum error: {e}")
@@ -885,6 +913,7 @@ with right:
                 else:
                     st.session_state.pop("y_drum", None)
                     st.session_state.pop("drum_bpm", None)
+                    st.session_state.pop("detected_drum_bpm", None)
                 st.session_state["download_meta"] = {
                     "root": melody_root if enable_melody else "none",
                     "scale": _scale_tag(melody_scale, bool(enable_melody)),
@@ -948,7 +977,11 @@ with right:
             st.caption(f"Seed used: {seed_val_local}")
             if "y_drum" in st.session_state:
                 drum_bpm_display = st.session_state.get("drum_bpm", "—")
-                st.caption(f"Drum layer: {drum_bpm_display} BPM")
+                detected_bpm_display = st.session_state.get("detected_drum_bpm")
+                if detected_bpm_display is not None:
+                    st.caption(f"Drum layer: {drum_bpm_display} BPM (detected {detected_bpm_display} BPM)")
+                else:
+                    st.caption(f"Drum layer: {drum_bpm_display} BPM")
             st.markdown("**Prompt**")
             prompt_key_now = (
                 "prompt",
@@ -957,7 +990,8 @@ with right:
                 bool(enable_drum),
                 round(float(melody_blend_gain), 3),
                 round(float(drum_blend_gain), 3),
-                round(float(drum_speed_mult), 3),
+                round(float(st.session_state.get("drum_bpm", drum_bpm)), 3),
+                bool(loop_drums),
             )
             if st.session_state.get("prompt_key") != prompt_key_now or "prompt_bytes" not in st.session_state:
                 prompt_wav_local = wav_bytes(y_render, sr_prompt_local)
@@ -1024,7 +1058,8 @@ with right:
                         bool(enable_drum),
                         round(float(melody_blend_gain), 3),
                         round(float(drum_blend_gain), 3),
-                        round(float(drum_speed_mult), 3),
+                        round(float(st.session_state.get("drum_bpm", drum_bpm)), 3),
+                        bool(loop_drums),
                     )
                     if st.session_state.get("combined_key") != combined_key_now or "combined_bytes" not in st.session_state:
                         combined_wav_local = wav_bytes_concat_segments([prompt_local, x_local.astype(np.float32, copy=False)], int(sr))

@@ -210,6 +210,40 @@ def scale_lane_events(
             for (start_s, duration_s, vel) in events
         ]
     return result
+
+
+def loop_lane_events(
+    lanes: Dict[str, List[Tuple[float, float, int]]],
+    prompt_seconds: float,
+) -> Dict[str, List[Tuple[float, float, int]]]:
+    """Repeat parsed lane events until they fill the prompt length.
+
+    The loop length is inferred from the last event end. This keeps simple
+    exported drum regions useful even when the generated prompt is longer.
+    """
+    max_end = 0.0
+    for events in lanes.values():
+        for start_s, duration_s, _ in events:
+            max_end = max(max_end, start_s + duration_s)
+    if max_end <= 0.0 or prompt_seconds <= max_end:
+        return lanes
+
+    result: Dict[str, List[Tuple[float, float, int]]] = {lane: [] for lane in lanes}
+    offset = 0.0
+    while offset < prompt_seconds:
+        for lane, events in lanes.items():
+            for start_s, duration_s, vel in events:
+                looped_start = start_s + offset
+                if looped_start >= prompt_seconds:
+                    continue
+                result[lane].append((looped_start, duration_s, vel))
+        offset += max_end
+
+    for lane in result:
+        result[lane].sort(key=lambda x: x[0])
+    return result
+
+
 def summarize_drum_lanes(lanes: Dict[str, List[Tuple[float, float, int]]]) -> dict:
     """Return a human-readable summary of lane contents."""
     summary = {}

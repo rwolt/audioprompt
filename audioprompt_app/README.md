@@ -46,6 +46,9 @@ Left column (Controls)
   - Drum character: Clean, tight, deep, bright, or breakbeat lane presets. These shift lane bands, decay, and light drive under the hood.
   - Snare tune: Shifts the snare noise band by semitones before synthesis, so the snare can sit lower or higher without changing MIDI note mapping.
   - Drum decay: Global envelope length for the drum layer. Lower values are tighter; higher values ring longer.
+  - Match melody BPM: Uses the Melody BPM as the drum target tempo.
+  - Drum BPM: Independent target tempo for the uploaded MIDI when Match melody BPM is off. The app reads the MIDI tempo and time-scales events to this target.
+  - Loop drums to prompt length: Repeats the uploaded MIDI groove until it fills Prompt seconds.
 - Focus (when enabled)
   - Preset: vocal (approximately 120-3200 Hz), guitar (approximately 80-6000 Hz), bass (approximately 40-300 Hz), or custom.
   - Custom band: Twin-handle Hz slider for low/high cutoff.
@@ -91,6 +94,8 @@ Drum MIDI Imprint notes
 - Each lane (kick / snare / hat / perc) is generated from band-limited pink noise with velocity-sensitive envelopes.
 - Velocity controls both loudness and decay time: ghost notes (low velocity) are softer and shorter; hard hits (high velocity) are louder and longer.
 - Drum character controls are deliberately compact: they prove tone/tuning/decay control without adding a full synthesizer panel.
+- Drum BPM is a target tempo, not pitch shifting. A 100 BPM MIDI file rendered at 125 BPM has its event times scaled by 1.25x.
+- Loop drums repeats the parsed MIDI event pattern to fill the prompt; disable it when your MIDI file already covers the full prompt length.
 - Use the Layer Blend sliders to balance melody level vs. drum level.
 - For drums-only output: disable Melody and Focus, enable Drum MIDI Imprint, and click Generate.
 
