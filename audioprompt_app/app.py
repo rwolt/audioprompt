@@ -591,7 +591,11 @@ with left:
             "Drum MIDI (.mid / .midi)",
             type=["mid", "midi"],
             accept_multiple_files=False,
-            help="Upload a General MIDI drum track (.mid / .midi). Kick=36, Snare=38, Hat=42.",
+            help=(
+                "Upload a General MIDI drum track exported from your DAW or drum sequencer. "
+                "Common notes: kick MIDI 36 (C1/C2), snare MIDI 38 (D1/D2), closed hat MIDI 42 "
+                "(F#1/F#2). Other mapped percussion goes to the Perc lane."
+            ),
             key="drum_midi_file",
         )
         if drum_midi_file is not None:
@@ -611,11 +615,45 @@ with left:
 
         dr1, dr2 = st.columns(2, gap="small")
         with dr1:
-            kick_gain = st.slider("Kick amount", 0.0, 2.0, 1.0, 0.05, help="Gain for kick lane.")
-            snare_gain = st.slider("Snare amount", 0.0, 2.0, 0.9, 0.05, help="Gain for snare lane.")
+            kick_gain = st.slider(
+                "Kick amount",
+                0.0,
+                2.0,
+                1.0,
+                0.05,
+                help=(
+                    "Gain for General MIDI kick notes 35/36, often B0/C1 or B1/C2 depending "
+                    "on your DAW octave display."
+                ),
+            )
+            snare_gain = st.slider(
+                "Snare amount",
+                0.0,
+                2.0,
+                0.9,
+                0.05,
+                help="Gain for General MIDI snare, clap, side stick, and tom notes routed to the snare noise lane.",
+            )
         with dr2:
-            hat_gain = st.slider("Hat amount", 0.0, 2.0, 0.7, 0.05, help="Gain for hi-hat / cymbal lane.")
-            perc_gain = st.slider("Perc amount", 0.0, 2.0, 0.5, 0.05, help="Gain for other percussion.")
+            hat_gain = st.slider(
+                "Hat amount",
+                0.0,
+                2.0,
+                0.7,
+                0.05,
+                help="Gain for General MIDI hi-hat and cymbal notes routed to the hat noise lane.",
+            )
+            perc_gain = st.slider(
+                "Perc amount",
+                0.0,
+                2.0,
+                0.5,
+                0.05,
+                help=(
+                    "Gain for miscellaneous General MIDI percussion and any unmapped notes routed "
+                    "to the perc noise lane."
+                ),
+            )
         drum_lane_gains = {
             "kick": kick_gain,
             "snare": snare_gain,

@@ -41,8 +41,8 @@ Left column (Controls)
   - Glide prob/frac: Probability and portion of each note gliding toward the next.
   - Vibrato Hz/Depth: Subtle expressive pitch modulation.
 - Drum MIDI Imprint (when enabled)
-  - Drum MIDI (.mid / .midi): Upload a General MIDI drum track.
-  - Per-lane gains: Kick, Snare, Hat, Perc amounts.
+  - Drum MIDI (.mid / .midi): Upload a General MIDI drum track exported from your DAW or drum sequencer.
+  - Per-lane gains: Kick, Snare, Hat, Perc amounts. These are broad noise lanes, not separate sample instruments.
   - Drum character: Clean, tight, deep, bright, or breakbeat lane presets. These shift lane bands, decay, and light drive under the hood.
   - Snare tune: Shifts the snare noise band by semitones before synthesis, so the snare can sit lower or higher without changing MIDI note mapping.
   - Drum decay: Global envelope length for the drum layer. Lower values are tighter; higher values ring longer.
@@ -80,19 +80,22 @@ Filename tagging
   - Tags: r = root, s = scale, mb = melody BPM, ms = melody/noise seed, db = drum BPM, ds = drum seed. Focus appears only when enabled, e.g. f-voc or f-b120-3200. Character appears only when non-neutral, e.g. ch-voice.
 
 MIDI Drum Map (General MIDI -> lanes)
-| Note | Lane | Description |
-|------|------|-------------|
-| 35, 36 | kick | Acoustic Kick, Bass Drum |
-| 37, 38, 39, 40 | snare | Side Stick, Acoustic Snare, Hand Clap, Electric Snare |
-| 41, 43, 45, 47, 48, 50 | snare | Low/Mid/High-Tom variants |
-| 42, 44, 46 | hat | Closed Hi-Hat, Pedal Hi-Hat, Open Hi-Hat |
-| 49, 51, 52, 55, 57, 59 | hat | Crash/Ride Cymbal variants |
-| 54, 56, 58, 62-85 | perc | Tambourine, Cowbell, Vibraslap, Conga/Bongo/Claves/etc. |
-- Any note not in the table goes to the perc lane.
+- AudioPrompt follows General MIDI drum notes. DAWs disagree about octave labels: MIDI 36 may show as C1 in Logic, but C2 in some other tools. The MIDI number is the source of truth.
+| MIDI notes | Common piano-roll names | Lane | Typical source |
+|------------|-------------------------|------|----------------|
+| 35, 36 | B0/C1 or B1/C2 | kick | Acoustic Kick, Bass Drum |
+| 37, 38, 39, 40 | C#1/D1/D#1/E1 or C#2/D2/D#2/E2 | snare | Side Stick, Acoustic Snare, Clap, Electric Snare |
+| 41, 43, 45, 47, 48, 50 | F1-G#1-A#1-B1-D2 or one octave higher | snare | Tom notes currently share the snare/body lane |
+| 42, 44, 46 | F#1/G#1/A#1 or F#2/G#2/A#2 | hat | Closed, Pedal, Open Hi-Hat |
+| 49, 51, 52, 55, 57, 59 | C#2/D#2/E2/G2/A2/B2 or one octave higher | hat | Crash/Ride/Splash cymbals share the hat lane |
+| 54, 56, 58, 62-85 | varies | perc | Tambourine, Cowbell, Congas, Bongos, Claves, etc. |
+- Any note not in the table goes to the perc lane so unexpected drum hits still make sound.
 - The parser reads all tracks because some DAWs export drums across multiple tracks.
+- For the quickest setup from Logic Session Drummer, export/convert the drummer region to MIDI and leave the notes on their General MIDI drum pitches. Start with kick/snare/hat, then use Perc amount if your groove includes auxiliary percussion.
 
 Drum MIDI Imprint notes
-- Each lane (kick / snare / hat / perc) is generated from band-limited pink noise with velocity-sensitive envelopes.
+- Each lane (kick / snare / hat / perc) is generated from its own band-limited pink noise source with velocity-sensitive envelopes.
+- Perc is a real fourth noise lane for miscellaneous percussion, but it is intentionally generic in this prototype.
 - Velocity controls both loudness and decay time: ghost notes (low velocity) are softer and shorter; hard hits (high velocity) are louder and longer.
 - Drum character controls are deliberately compact: they prove tone/tuning/decay control without adding a full synthesizer panel.
 - Drum BPM is a target tempo, not pitch shifting. A 100 BPM MIDI file rendered at 125 BPM has its event times scaled by 1.25x.

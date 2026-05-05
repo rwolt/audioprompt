@@ -10,7 +10,7 @@ Demo: [https://audioprompt.streamlit.app/](https://audioprompt.streamlit.app/)
 - 🎛️ Lightweight character controls for melody tone and note shape
 - 🎚️ Spectral focus (vocal/guitar/bass presets or custom Hz band)
 - 🥁 Rhythmic gate from note events (phrase‑like envelope)
-- 🥁 **Drum MIDI Imprint** — upload a MIDI drum track to generate a rhythmic noise layer (velocity‑sensitive kick/snare/hat/perc layers with tone, tune, decay, and blend controls)
+- 🥁 **Drum MIDI Imprint** — upload a General MIDI drum track to generate a rhythmic noise layer (velocity‑sensitive kick/snare/hat/perc lanes with tone, tune, decay, and blend controls)
 - 📎 Drag‑and‑drop input; tagged downloads (scale/focus/drum/seed)
 - 🧰 Pure Python DSP (NumPy/SciPy/soundfile)
 
@@ -135,7 +135,7 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
   - Multiplies the STFT magnitude by this mask to emphasize harmonic structure; preserves phase; ISTFT back to time domain; re‑normalize.
 - Focus band (optional): applies a global soft band‑pass mask in log‑frequency (preset or custom low/high Hz), with outside‑band floor.
 - Rhythmic gate (optional): constructs an amplitude envelope from event onsets/offsets (attack/release), and applies it to the prompt.
-- Drum MIDI Imprint (optional): parses a General MIDI drum track, maps notes to kick/snare/hat/perc lanes, generates band-limited pink noise per lane, and applies velocity-sensitive AD envelopes. Drum character presets shift lane frequency bands, decay, and light drive; snare tune shifts the snare lane by semitones before synthesis. Drum BPM can match Melody BPM or independently time-scale the MIDI, prompt length can match the MIDI region, and optional looping repeats short grooves to fill the prompt.
+- Drum MIDI Imprint (optional): parses a General MIDI drum track, maps common drum notes to kick/snare/hat/perc noise lanes, generates band-limited pink noise per lane, and applies velocity-sensitive AD envelopes. Drum character presets shift lane frequency bands, decay, and light drive; snare tune shifts the snare lane by semitones before synthesis. Drum BPM can match Melody BPM or independently time-scale the MIDI, prompt length can match the MIDI region, and optional looping repeats short grooves to fill the prompt.
 - Prepend path: resamples the prompt if needed, trims to the resolved prompt length, applies gain and fades, concatenates with the input, and trims peaks (≤ −1 dBFS).
 - Tagged filenames: use compact tags for root, scale, melody BPM, melody/noise seed, drum BPM, drum seed, and optional focus/character settings.
 - Determinism: fixed `seed` yields repeatable results; `-1` chooses a new random seed at each generation (Streamlit app).
