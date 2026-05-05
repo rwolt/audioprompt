@@ -137,7 +137,7 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 - Rhythmic gate (optional): constructs an amplitude envelope from event onsets/offsets (attack/release), and applies it to the prompt.
 - Drum MIDI Imprint (optional): parses a General MIDI drum track, maps notes to kick/snare/hat/perc lanes, generates band-limited pink noise per lane, and applies velocity-sensitive AD envelopes. Drum character presets shift lane frequency bands, decay, and light drive; snare tune shifts the snare lane by semitones before synthesis. Drum BPM can match Melody BPM or independently time-scale the MIDI, and optional looping repeats short grooves to fill the prompt.
 - Prepend path: resamples the prompt if needed, trims to “prompt seconds”, applies gain and fades, concatenates with the input, and trims peaks (≤ −1 dBFS).
-- Tagged filenames: use compact tags for root, scale, melody/noise seed, drum seed, and optional focus/character settings.
+- Tagged filenames: use compact tags for root, scale, melody BPM, melody/noise seed, drum BPM, drum seed, and optional focus/character settings.
 - Determinism: fixed `seed` yields repeatable results; `-1` chooses a new random seed at each generation (Streamlit app).
 
 ---

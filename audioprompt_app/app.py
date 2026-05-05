@@ -32,6 +32,7 @@ from audioprompt_core.melody import (
     events_to_f0,
 )
 from audioprompt_core.mididrums import (
+    detect_midi_bpm,
     parse_midi_drum_events,
     scale_lane_events,
     loop_lane_events,
@@ -118,6 +119,24 @@ def _upload_signature(uploaded_file):
     return (getattr(uploaded_file, "name", None), getattr(uploaded_file, "size", None))
 
 
+def _detect_uploaded_drum_bpm(uploaded_file) -> float | None:
+    if uploaded_file is None:
+        return None
+    sig = _upload_signature(uploaded_file)
+    if st.session_state.get("_drum_bpm_sig") == sig:
+        return st.session_state.get("detected_drum_bpm_preview")
+    try:
+        bpm = float(detect_midi_bpm(uploaded_file.getvalue()))
+    except Exception as e:
+        _log_debug(f"[drum] BPM preview failed: {e}")
+        bpm = None
+    st.session_state["_drum_bpm_sig"] = sig
+    st.session_state["detected_drum_bpm_preview"] = bpm
+    if bpm is not None:
+        st.session_state["drum_bpm_value"] = int(round(bpm))
+    return bpm
+
+
 def _slug(value: object) -> str:
     text = str(value).lower().replace("_", "-").replace(" ", "-")
     keep = []
@@ -175,8 +194,12 @@ def _download_name(kind: str, base_stem: str | None, meta: dict) -> str:
         kind,
         f"r-{_root_tag(meta.get('root', 'none'))}",
         f"s-{meta.get('scale', 'none')}",
+        f"mb-{int(round(float(meta.get('melody_bpm', 0))))}",
         f"ms-{meta.get('melody_seed', 'none')}",
     ]
+    drum_bpm = meta.get("drum_bpm")
+    if drum_bpm is not None:
+        parts.append(f"db-{int(round(float(drum_bpm)))}")
     drum_seed = meta.get("drum_seed")
     if drum_seed is not None:
         parts.append(f"ds-{drum_seed}")
@@ -550,6 +573,7 @@ with left:
     drum_bpm = int(bpm)
     match_melody_bpm = True
     loop_drums = True
+    st.session_state.setdefault("drum_bpm_value", int(bpm))
     if enable_drum:
         drum_midi_file = st.file_uploader(
             "Drum MIDI (.mid / .midi)",
@@ -560,11 +584,14 @@ with left:
         )
         if drum_midi_file is not None:
             st.caption(f"Uploaded: {drum_midi_file.name}")
-            # BPM is parsed during generation and shown there to avoid interfering
-            # with the drag-and-drop upload handshake.
+            detected_bpm_preview = _detect_uploaded_drum_bpm(drum_midi_file)
+            if detected_bpm_preview is not None:
+                st.caption(f"Detected drum MIDI: {detected_bpm_preview:g} BPM")
         else:
             st.session_state.pop("y_drum", None)
             st.session_state.pop("drum_bpm", None)
+            st.session_state.pop("detected_drum_bpm_preview", None)
+            st.session_state.pop("_drum_bpm_sig", None)
 
         dr1, dr2 = st.columns(2, gap="small")
         with dr1:
@@ -614,19 +641,28 @@ with left:
                 value=True,
                 help="Use the melody BPM for the drum layer. Turn off to set an independent drum BPM.",
             )
+            detected_bpm_for_reset = st.session_state.get("detected_drum_bpm_preview")
+            if st.button(
+                "Use detected BPM",
+                disabled=detected_bpm_for_reset is None,
+                help="Reset Independent drum BPM to the tempo detected in the uploaded MIDI file.",
+            ):
+                st.session_state["drum_bpm_value"] = int(round(float(detected_bpm_for_reset)))
         with tempo2:
             drum_bpm = st.slider(
-                "Drum BPM",
+                "Independent drum BPM",
                 40,
                 220,
-                int(bpm),
-                1,
+                value=int(st.session_state.get("drum_bpm_value", bpm)),
+                step=1,
+                key="drum_bpm_value",
                 disabled=match_melody_bpm,
                 help=(
-                    "Target BPM for the uploaded drum MIDI. The app reads the MIDI tempo, "
-                    "then time-scales the drum events to this BPM."
+                    "Target BPM used only when Match melody BPM is off. "
+                    "New uploads start at their detected MIDI BPM so you can quickly return to the original groove tempo."
                 ),
             )
+            drum_bpm = int(st.session_state.get("drum_bpm_value", drum_bpm))
         loop_drums = st.checkbox(
             "Loop drums to prompt length",
             value=True,
@@ -917,7 +953,9 @@ with right:
                 st.session_state["download_meta"] = {
                     "root": melody_root if enable_melody else "none",
                     "scale": _scale_tag(melody_scale, bool(enable_melody)),
+                    "melody_bpm": bpm,
                     "melody_seed": seed_to_use,
+                    "drum_bpm": target_drum_bpm if drum_seed_used is not None else None,
                     "drum_seed": drum_seed_used,
                     "focus": _focus_tag(
                         bool(enable_focus),
@@ -960,7 +998,9 @@ with right:
                 {
                     "root": melody_root if enable_melody else "none",
                     "scale": _scale_tag(melody_scale, bool(enable_melody)),
+                    "melody_bpm": bpm,
                     "melody_seed": seed_val_local,
+                    "drum_bpm": st.session_state.get("drum_bpm") if "y_drum" in st.session_state else None,
                     "drum_seed": seed_val_local + 1 if "y_drum" in st.session_state else None,
                     "focus": _focus_tag(
                         bool(enable_focus),

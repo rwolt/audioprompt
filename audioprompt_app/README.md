@@ -47,7 +47,8 @@ Left column (Controls)
   - Snare tune: Shifts the snare noise band by semitones before synthesis, so the snare can sit lower or higher without changing MIDI note mapping.
   - Drum decay: Global envelope length for the drum layer. Lower values are tighter; higher values ring longer.
   - Match melody BPM: Uses the Melody BPM as the drum target tempo.
-  - Drum BPM: Independent target tempo for the uploaded MIDI when Match melody BPM is off. The app reads the MIDI tempo and time-scales events to this target.
+  - Use detected BPM: Resets the independent drum BPM to the tempo found in the uploaded MIDI.
+  - Independent drum BPM: Independent target tempo for the uploaded MIDI when Match melody BPM is off. New uploads start at their detected MIDI BPM, so unchecking Match melody BPM returns to the original groove tempo.
   - Loop drums to prompt length: Repeats the uploaded MIDI groove until it fills Prompt seconds.
 - Focus (when enabled)
   - Preset: vocal (approximately 120-3200 Hz), guitar (approximately 80-6000 Hz), bass (approximately 40-300 Hz), or custom.
@@ -74,9 +75,9 @@ Right column (Output & Seed, Layer Blend, Generate, Outputs)
 
 Filename tagging
 - Output names use compact tags for the most important generation settings.
-  - Prompt only: ap_prompt_r-e_s-minpent_ms-1234_ds-1235.wav
-  - Combined: my-song-take-1_combined_r-e_s-minpent_ms-1234_ds-1235.wav
-  - Tags: r = root, s = scale, ms = melody/noise seed, ds = drum seed. Focus appears only when enabled, e.g. f-voc or f-b120-3200. Character appears only when non-neutral, e.g. ch-voice.
+  - Prompt only: ap_prompt_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav
+  - Combined: my-song-take-1_combined_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav
+  - Tags: r = root, s = scale, mb = melody BPM, ms = melody/noise seed, db = drum BPM, ds = drum seed. Focus appears only when enabled, e.g. f-voc or f-b120-3200. Character appears only when non-neutral, e.g. ch-voice.
 
 MIDI Drum Map (General MIDI -> lanes)
 | Note | Lane | Description |

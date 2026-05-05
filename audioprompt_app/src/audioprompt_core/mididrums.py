@@ -86,6 +86,16 @@ def _get_bpm(midi_file: mido.MidiFile) -> float:
     return 120.0
 
 
+def detect_midi_bpm(file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO]) -> float:
+    """Return the first tempo found in a MIDI file, defaulting to 120 BPM."""
+    readable = _as_readable_midi(file_or_bytes)
+    if isinstance(readable, BytesIO):
+        midi_file = mido.MidiFile(file=readable)
+    else:
+        midi_file = mido.MidiFile(readable)
+    return _get_bpm(midi_file)
+
+
 def parse_midi_drum_events(
     file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO],
 ) -> Tuple[Dict[str, List[Tuple[float, float, int]]], float]:
