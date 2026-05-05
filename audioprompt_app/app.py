@@ -32,7 +32,7 @@ from audioprompt_core.melody import (
     events_to_f0,
 )
 from audioprompt_core.mididrums import (
-    detect_midi_bpm,
+    inspect_midi_timing,
     parse_midi_drum_events,
     scale_lane_events,
     loop_lane_events,
@@ -119,22 +119,30 @@ def _upload_signature(uploaded_file):
     return (getattr(uploaded_file, "name", None), getattr(uploaded_file, "size", None))
 
 
-def _detect_uploaded_drum_bpm(uploaded_file) -> float | None:
+def _inspect_uploaded_drum_midi(uploaded_file) -> dict | None:
     if uploaded_file is None:
         return None
     sig = _upload_signature(uploaded_file)
     if st.session_state.get("_drum_bpm_sig") == sig:
-        return st.session_state.get("detected_drum_bpm_preview")
+        return st.session_state.get("drum_timing_preview")
     try:
-        bpm = float(detect_midi_bpm(uploaded_file.getvalue()))
+        timing = inspect_midi_timing(uploaded_file.getvalue())
     except Exception as e:
         _log_debug(f"[drum] BPM preview failed: {e}")
-        bpm = None
+        timing = None
     st.session_state["_drum_bpm_sig"] = sig
-    st.session_state["detected_drum_bpm_preview"] = bpm
-    if bpm is not None:
-        st.session_state["drum_bpm_value"] = int(round(bpm))
-    return bpm
+    st.session_state["drum_timing_preview"] = timing
+    st.session_state["detected_drum_bpm_preview"] = timing["bpm"] if timing else None
+    if timing is not None:
+        st.session_state["drum_bpm_value"] = int(round(float(timing["bpm"])))
+    return timing
+
+
+def _matched_drum_length_seconds(timing: dict | None, target_bpm: float) -> float | None:
+    if not timing or not timing.get("length_s"):
+        return None
+    detected_bpm = max(float(timing.get("bpm", 0.0)), 1e-6)
+    return float(timing["length_s"]) * detected_bpm / max(float(target_bpm), 1e-6)
 
 
 def _slug(value: object) -> str:
@@ -203,6 +211,9 @@ def _download_name(kind: str, base_stem: str | None, meta: dict) -> str:
     drum_seed = meta.get("drum_seed")
     if drum_seed is not None:
         parts.append(f"ds-{drum_seed}")
+    length_s = meta.get("length_s")
+    if length_s is not None:
+        parts.append(f"len-{float(length_s):.1f}s")
     focus = meta.get("focus", "none")
     if focus != "none":
         parts.append(f"f-{focus}")
@@ -573,6 +584,7 @@ with left:
     drum_bpm = int(bpm)
     match_melody_bpm = True
     loop_drums = True
+    drum_timing_preview = None
     st.session_state.setdefault("drum_bpm_value", int(bpm))
     if enable_drum:
         drum_midi_file = st.file_uploader(
@@ -584,13 +596,17 @@ with left:
         )
         if drum_midi_file is not None:
             st.caption(f"Uploaded: {drum_midi_file.name}")
-            detected_bpm_preview = _detect_uploaded_drum_bpm(drum_midi_file)
-            if detected_bpm_preview is not None:
-                st.caption(f"Detected drum MIDI: {detected_bpm_preview:g} BPM")
+            drum_timing_preview = _inspect_uploaded_drum_midi(drum_midi_file)
+            if drum_timing_preview is not None:
+                st.caption(
+                    f"Detected drum MIDI: {drum_timing_preview['bpm']:g} BPM, "
+                    f"{drum_timing_preview['length_s']:.2f} sec"
+                )
         else:
             st.session_state.pop("y_drum", None)
             st.session_state.pop("drum_bpm", None)
             st.session_state.pop("detected_drum_bpm_preview", None)
+            st.session_state.pop("drum_timing_preview", None)
             st.session_state.pop("_drum_bpm_sig", None)
 
         dr1, dr2 = st.columns(2, gap="small")
@@ -663,6 +679,10 @@ with left:
                 ),
             )
             drum_bpm = int(st.session_state.get("drum_bpm_value", drum_bpm))
+        target_drum_bpm_preview = float(bpm) if match_melody_bpm else float(drum_bpm)
+        matched_drum_seconds = _matched_drum_length_seconds(drum_timing_preview, target_drum_bpm_preview)
+        if matched_drum_seconds is not None:
+            st.caption(f"Matched drum length: {matched_drum_seconds:.2f} sec at {target_drum_bpm_preview:g} BPM")
         loop_drums = st.checkbox(
             "Loop drums to prompt length",
             value=True,
@@ -815,14 +835,33 @@ with right:
         # no UI toggle needed to keep the interface clean.
 
         # Output & Seed just beneath Generate (no separate heading to reduce clutter)
-        prompt_seconds = st.slider(
-            "Prompt seconds",
+        length_mode_options = ["Manual seconds"]
+        if enable_drum and drum_midi_file is not None and matched_drum_seconds is not None:
+            length_mode_options.append("Match drum MIDI")
+        prompt_length_mode = st.radio(
+            "Prompt length",
+            options=length_mode_options,
+            index=0,
+            horizontal=True,
+            help=(
+                "Manual uses the seconds slider. Match drum MIDI uses the uploaded MIDI region length, "
+                "adjusted to the target drum BPM."
+            ),
+        )
+        manual_prompt_seconds = st.slider(
+            "Manual seconds",
             1.0,
             12.0,
             4.0,
             0.5,
-            help="Length of the generated prompt (also used when prepending).",
+            disabled=prompt_length_mode != "Manual seconds",
+            help="Length of the generated prompt when Prompt length is set to Manual seconds.",
         )
+        if prompt_length_mode == "Match drum MIDI" and matched_drum_seconds is not None:
+            prompt_seconds = float(matched_drum_seconds)
+            st.caption(f"Prompt length matched to drum MIDI: {prompt_seconds:.2f} sec")
+        else:
+            prompt_seconds = float(manual_prompt_seconds)
         st.markdown("**Prompt Level**")
         ag_col1, ag_col2 = st.columns([1,1])
         with ag_col1:
@@ -957,6 +996,7 @@ with right:
                     "melody_seed": seed_to_use,
                     "drum_bpm": target_drum_bpm if drum_seed_used is not None else None,
                     "drum_seed": drum_seed_used,
+                    "length_s": prompt_seconds,
                     "focus": _focus_tag(
                         bool(enable_focus),
                         focus_params.get("preset"),
@@ -1002,6 +1042,7 @@ with right:
                     "melody_seed": seed_val_local,
                     "drum_bpm": st.session_state.get("drum_bpm") if "y_drum" in st.session_state else None,
                     "drum_seed": seed_val_local + 1 if "y_drum" in st.session_state else None,
+                    "length_s": prompt_seconds,
                     "focus": _focus_tag(
                         bool(enable_focus),
                         focus_params.get("preset"),
@@ -1032,6 +1073,7 @@ with right:
                 round(float(drum_blend_gain), 3),
                 round(float(st.session_state.get("drum_bpm", drum_bpm)), 3),
                 bool(loop_drums),
+                round(float(prompt_seconds), 3),
             )
             if st.session_state.get("prompt_key") != prompt_key_now or "prompt_bytes" not in st.session_state:
                 prompt_wav_local = wav_bytes(y_render, sr_prompt_local)
@@ -1100,6 +1142,7 @@ with right:
                         round(float(drum_blend_gain), 3),
                         round(float(st.session_state.get("drum_bpm", drum_bpm)), 3),
                         bool(loop_drums),
+                        round(float(prompt_seconds), 3),
                     )
                     if st.session_state.get("combined_key") != combined_key_now or "combined_bytes" not in st.session_state:
                         combined_wav_local = wav_bytes_concat_segments([prompt_local, x_local.astype(np.float32, copy=False)], int(sr))

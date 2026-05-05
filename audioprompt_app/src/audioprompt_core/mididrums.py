@@ -96,6 +96,30 @@ def detect_midi_bpm(file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO]) 
     return _get_bpm(midi_file)
 
 
+def inspect_midi_timing(file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO]) -> dict:
+    """Return lightweight timing metadata for UI previews."""
+    readable = _as_readable_midi(file_or_bytes)
+    if isinstance(readable, BytesIO):
+        midi_file = mido.MidiFile(file=readable)
+    else:
+        midi_file = mido.MidiFile(readable)
+    bpm = _get_bpm(midi_file)
+    tempo = mido.bpm2tempo(bpm)
+    max_tick = 0
+    for track in midi_file.tracks:
+        abs_tick = 0
+        for msg in track:
+            abs_tick += msg.time
+        max_tick = max(max_tick, abs_tick)
+    length_s = mido.tick2second(max_tick, midi_file.ticks_per_beat, tempo) if max_tick > 0 else 0.0
+    return {
+        "bpm": float(bpm),
+        "length_s": float(length_s),
+        "ticks": int(max_tick),
+        "ticks_per_beat": int(midi_file.ticks_per_beat),
+    }
+
+
 def parse_midi_drum_events(
     file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO],
 ) -> Tuple[Dict[str, List[Tuple[float, float, int]]], float]:

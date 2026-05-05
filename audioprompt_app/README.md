@@ -29,7 +29,7 @@ Left column (Controls)
   - Enable melody: Imprint a randomized melody (scale-constrained) onto pink noise.
   - Enable focus band: Emphasize energy in a preset band (vocal/guitar/bass) or a custom Hz range.
   - Enable rhythmic gate: Apply a syllabic/phrase-like amplitude envelope from the melody events.
-- Prompt seconds: Duration of the generated prompt (also used for prepend length).
+- Prompt length: Manual seconds uses the slider; Match drum MIDI uses the uploaded MIDI region length adjusted to the target drum BPM. Matched mode can be longer than the manual slider range.
 - Melody (when enabled)
   - Root, Scale: Choose any from the built-in list (includes minor_blues, pentatonic, modes, etc.).
   - BPM: Tempo used for randomized event durations. If you also uploaded a Drum MIDI, match this BPM to the drum track.
@@ -96,6 +96,7 @@ Drum MIDI Imprint notes
 - Velocity controls both loudness and decay time: ghost notes (low velocity) are softer and shorter; hard hits (high velocity) are louder and longer.
 - Drum character controls are deliberately compact: they prove tone/tuning/decay control without adding a full synthesizer panel.
 - Drum BPM is a target tempo, not pitch shifting. A 100 BPM MIDI file rendered at 125 BPM has its event times scaled by 1.25x.
+- Match drum MIDI prompt length uses the MIDI region length from the longest track, then adjusts that length to the target drum BPM.
 - Loop drums repeats the parsed MIDI event pattern to fill the prompt; disable it when your MIDI file already covers the full prompt length.
 - Use the Layer Blend sliders to balance melody level vs. drum level.
 - For drums-only output: disable Melody and Focus, enable Drum MIDI Imprint, and click Generate.
