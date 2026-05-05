@@ -25,6 +25,32 @@ def _soft_band_envelope(f_hz, low_hz, high_hz, sharpness=12.0):
     return lo * hi
 
 
+def _timbre_weights(k: int, character: str) -> float:
+    """Return a harmonic weight for a small set of musician-facing characters."""
+    if character == "bright":
+        return 0.85 + 0.12 * k
+    if character == "warm":
+        return np.exp(-0.18 * (k - 1))
+    if character == "voice":
+        return 1.0 if k <= 5 else 0.35
+    if character == "reed":
+        return 1.0 / k if k % 2 == 1 else 0.08 / k
+    if character == "bell":
+        return np.exp(-((k - 3) ** 2) / 4.0)
+    if character == "pluck":
+        return np.exp(-0.38 * (k - 1))
+    return 1.0
+
+
+def _mask_shape_kernel(freqs, fk, bw, shape: str) -> np.ndarray:
+    x = (freqs - fk) / (bw + 1e-6)
+    if shape == "soft":
+        return 1.0 / (1.0 + x**2)
+    if shape == "tight":
+        return np.maximum(0.0, 1.0 - np.abs(x) / np.sqrt(2))
+    return np.exp(-0.5 * x**2)
+
+
 def imprint_melody_focus(
     noise: np.ndarray,
     sr: int,
@@ -37,6 +63,9 @@ def imprint_melody_focus(
     band_floor_db: float = -18.0,
     sharpness: float = 12.0,
     n_fft: int = 2048,
+    character: str = "neutral",
+    note_shape: str = "natural",
+    detune_spread_cents: float = 0.0,
 ) -> np.ndarray:
     hop = n_fft // 4
     # Use Hann window with default boundary handling to satisfy NOLA/overlap-add conditions
@@ -75,7 +104,13 @@ def imprint_melody_focus(
             if fk > freqs[-1]:
                 break
             bw = bw_frac * fk
-            mask += np.exp(-0.5 * ((freqs - fk) / (bw + 1e-6)) ** 2)
+            weight = _timbre_weights(k, character)
+            shape = "tight" if note_shape == "tight" else "soft" if note_shape == "smooth" else "gaussian"
+            mask += weight * _mask_shape_kernel(freqs, fk, bw, shape)
+            if detune_spread_cents > 0:
+                spread = 2.0 ** (detune_spread_cents / 1200.0)
+                mask += 0.35 * weight * _mask_shape_kernel(freqs, fk / spread, bw, shape)
+                mask += 0.35 * weight * _mask_shape_kernel(freqs, fk * spread, bw, shape)
         if mask.max() > 0:
             mask = 1.0 + (gain * (mask / mask.max()))
             mag[:, i] *= mask

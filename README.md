@@ -7,9 +7,11 @@ Demo: [https://audioprompt.streamlit.app/](https://audioprompt.streamlit.app/)
 
 ## ✨ Features
 - 🧠 Scale‑driven melody imprint (randomized, in‑key, with vibrato/glides)
+- 🎛️ Lightweight character controls for melody tone and note shape
 - 🎚️ Spectral focus (vocal/guitar/bass presets or custom Hz band)
 - 🥁 Rhythmic gate from note events (phrase‑like envelope)
-- 📎 Drag‑and‑drop input; tagged downloads (scale/focus/seed)
+- 🥁 **Drum MIDI Imprint** — upload a General MIDI drum track to generate a rhythmic noise layer (velocity‑sensitive kick/snare/hat/perc lanes with tone, tune, decay, and blend controls)
+- 📎 Drag‑and‑drop input; tagged downloads (scale/focus/drum/seed)
 - 🧰 Pure Python DSP (NumPy/SciPy/soundfile)
 
 ---
@@ -69,8 +71,8 @@ Deploy to Streamlit Community Cloud
 
 Quick start (in the app)
 - Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only
-- Set Prompt seconds and Melody (root/scale/BPM/range)
-- Use Focus (vocal/guitar/bass/custom Hz band) and enable Tame Low End if needed
+- Set Prompt seconds or match prompt length to uploaded drum MIDI, then choose Melody settings (root/scale/BPM/range)
+- Use Focus (vocal/guitar/bass/custom Hz band) and enable Bass Roll-Off if needed
 - Press “Generate Prompt” → preview Prompt and (if provided) Combined → download tagged WAVs
 
 Tips
@@ -115,7 +117,7 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 
 ## 📁 Project Layout
 - `audioprompt_app/` — Streamlit app (two‑column UI, dark theme, drag‑drop upload)
-- `audioprompt_app/src/audioprompt_core/` — shared core (audio, melody, prompt)
+- `audioprompt_app/src/audioprompt_core/` — shared core (audio, melody, prompt, mididrums, drumnoise)
 - `audioprompt.py` — CLI (analyze/prompt/prepend)
 - `requirements.txt` — minimal dependencies for the CLI/analysis tools
 
@@ -127,13 +129,15 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
   - Picks scale notes (root + mode) within a MIDI range; durations from BPM‑scaled choices.
   - Step/leap behavior, rests, and seed‑driven randomness; converts notes to an f0 trajectory.
   - Expression: optional glides between notes and subtle vibrato; light smoothing to reduce discontinuities.
+  - Character controls adjust harmonic balance and note envelope using simple musician-facing presets.
 - Spectral imprint:
-  - STFT on the pink noise; per frame, builds a harmonic mask centered at the current f0 (and harmonics) with Gaussian bandwidth proportional to frequency.
+  - STFT on the pink noise; per frame, builds a harmonic mask centered at the current f0 (and harmonics) with bandwidth proportional to frequency.
   - Multiplies the STFT magnitude by this mask to emphasize harmonic structure; preserves phase; ISTFT back to time domain; re‑normalize.
 - Focus band (optional): applies a global soft band‑pass mask in log‑frequency (preset or custom low/high Hz), with outside‑band floor.
 - Rhythmic gate (optional): constructs an amplitude envelope from event onsets/offsets (attack/release), and applies it to the prompt.
-- Prepend path: resamples the prompt if needed, trims to “prompt seconds”, applies gain and fades, concatenates with the input, and trims peaks (≤ −1 dBFS).
-- Tagged filenames: include `scale`, `focus` (preset or band), and `seed_used` for easy A/B comparisons.
+- Drum MIDI Imprint (optional): parses a General MIDI drum track, maps common drum notes to kick/snare/hat/perc noise lanes, generates band-limited pink noise per lane, and applies velocity-sensitive AD envelopes. Drum character presets shift lane frequency bands, decay, and light drive; snare tune shifts the snare lane by semitones before synthesis. Drum BPM can match Melody BPM or independently time-scale the MIDI, prompt length can match the MIDI region, and optional looping repeats short grooves to fill the prompt.
+- Prepend path: resamples the prompt if needed, trims to the resolved prompt length, applies gain and fades, concatenates with the input, and trims peaks (≤ −1 dBFS).
+- Tagged filenames: use compact tags for root, scale, melody BPM, melody/noise seed, drum BPM, drum seed, and optional focus/character settings.
 - Determinism: fixed `seed` yields repeatable results; `-1` chooses a new random seed at each generation (Streamlit app).
 
 ---
