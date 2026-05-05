@@ -687,8 +687,8 @@ with left:
             "Loop drums to prompt length",
             value=True,
             help=(
-                "Repeat the uploaded drum MIDI until it fills Prompt seconds. "
-                "Turn off if the MIDI file is already arranged for the full prompt."
+                "Repeats the drum MIDI when the prompt is longer than the MIDI region. "
+                "Turn off to let the drums stop after the uploaded MIDI ends."
             ),
         )
     else:
@@ -835,26 +835,27 @@ with right:
         # no UI toggle needed to keep the interface clean.
 
         # Output & Seed just beneath Generate (no separate heading to reduce clutter)
-        length_mode_options = ["Manual seconds"]
-        if enable_drum and drum_midi_file is not None and matched_drum_seconds is not None:
-            length_mode_options.append("Match drum MIDI")
-        prompt_length_mode = st.radio(
-            "Prompt length",
-            options=length_mode_options,
-            index=0,
-            horizontal=True,
-            help=(
-                "Manual uses the seconds slider. Match drum MIDI uses the uploaded MIDI region length, "
-                "adjusted to the target drum BPM."
-            ),
-        )
+        can_match_drum_length = enable_drum and drum_midi_file is not None and matched_drum_seconds is not None
+        if can_match_drum_length:
+            prompt_length_mode = st.radio(
+                "Prompt length",
+                options=["Match drum MIDI", "Manual seconds"],
+                index=0,
+                horizontal=True,
+                help=(
+                    "Match drum MIDI uses the uploaded MIDI region length, adjusted to the target drum BPM. "
+                    "Manual uses the seconds slider."
+                ),
+            )
+        else:
+            prompt_length_mode = "Manual seconds"
         manual_prompt_seconds = st.slider(
-            "Manual seconds",
+            "Manual seconds" if can_match_drum_length else "Prompt seconds",
             1.0,
-            12.0,
+            20.0,
             4.0,
             0.5,
-            disabled=prompt_length_mode != "Manual seconds",
+            disabled=can_match_drum_length and prompt_length_mode != "Manual seconds",
             help="Length of the generated prompt when Prompt length is set to Manual seconds.",
         )
         if prompt_length_mode == "Match drum MIDI" and matched_drum_seconds is not None:

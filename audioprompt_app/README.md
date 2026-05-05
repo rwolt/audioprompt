@@ -29,7 +29,7 @@ Left column (Controls)
   - Enable melody: Imprint a randomized melody (scale-constrained) onto pink noise.
   - Enable focus band: Emphasize energy in a preset band (vocal/guitar/bass) or a custom Hz range.
   - Enable rhythmic gate: Apply a syllabic/phrase-like amplitude envelope from the melody events.
-- Prompt length: Manual seconds uses the slider; Match drum MIDI uses the uploaded MIDI region length adjusted to the target drum BPM. Matched mode can be longer than the manual slider range.
+- Prompt length: Without drum MIDI, use the Prompt seconds slider. With drum MIDI, Match drum MIDI is the default and uses the uploaded MIDI region length adjusted to the target drum BPM; Manual seconds is still available up to 20 seconds.
 - Melody (when enabled)
   - Root, Scale: Choose any from the built-in list (includes minor_blues, pentatonic, modes, etc.).
   - BPM: Tempo used for randomized event durations. If you also uploaded a Drum MIDI, match this BPM to the drum track.
@@ -49,7 +49,7 @@ Left column (Controls)
   - Match melody BPM: Uses the Melody BPM as the drum target tempo.
   - Use detected BPM: Resets the independent drum BPM to the tempo found in the uploaded MIDI.
   - Independent drum BPM: Independent target tempo for the uploaded MIDI when Match melody BPM is off. New uploads start at their detected MIDI BPM, so unchecking Match melody BPM returns to the original groove tempo.
-  - Loop drums to prompt length: Repeats the uploaded MIDI groove until it fills Prompt seconds.
+  - Loop drums to prompt length: Repeats the uploaded MIDI when the prompt is longer than the MIDI region. Turn it off to let drums stop after the uploaded MIDI ends.
 - Focus (when enabled)
   - Preset: vocal (approximately 120-3200 Hz), guitar (approximately 80-6000 Hz), bass (approximately 40-300 Hz), or custom.
   - Custom band: Twin-handle Hz slider for low/high cutoff.
@@ -97,14 +97,14 @@ Drum MIDI Imprint notes
 - Drum character controls are deliberately compact: they prove tone/tuning/decay control without adding a full synthesizer panel.
 - Drum BPM is a target tempo, not pitch shifting. A 100 BPM MIDI file rendered at 125 BPM has its event times scaled by 1.25x.
 - Match drum MIDI prompt length uses the MIDI region length from the longest track, then adjusts that length to the target drum BPM.
-- Loop drums repeats the parsed MIDI event pattern to fill the prompt; disable it when your MIDI file already covers the full prompt length.
+- Loop drums repeats the parsed MIDI event pattern when the prompt is longer than the MIDI region; disable it when you want the drums to stop after the uploaded MIDI ends.
 - Use the Layer Blend sliders to balance melody level vs. drum level.
 - For drums-only output: disable Melody and Focus, enable Drum MIDI Imprint, and click Generate.
 
 Performance & Limits
 - Defaults are tuned for responsiveness: 48 kHz, 4 s prompts, n_fft=2048.
 - Recommend prompt seconds 3-6 for clear steer without masking.
-- Max prompt seconds capped at 12 by the UI; adjust in code if needed. (Prepend uses prompt length.)
+- Manual prompt seconds are capped at 20 by the UI. Match drum MIDI can produce longer prompts when the uploaded MIDI region is longer.
 - Input files are resampled to SR; large multi-minute files are not recommended (trim externally).
 
 How it works (core pieces)

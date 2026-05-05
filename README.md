@@ -71,7 +71,7 @@ Deploy to Streamlit Community Cloud
 
 Quick start (in the app)
 - Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only
-- Set Prompt seconds and Melody (root/scale/BPM/range)
+- Set Prompt seconds or match prompt length to uploaded drum MIDI, then choose Melody settings (root/scale/BPM/range)
 - Use Focus (vocal/guitar/bass/custom Hz band) and enable Bass Roll-Off if needed
 - Press “Generate Prompt” → preview Prompt and (if provided) Combined → download tagged WAVs
 
