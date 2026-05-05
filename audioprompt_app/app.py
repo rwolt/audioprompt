@@ -593,8 +593,8 @@ with left:
             accept_multiple_files=False,
             help=(
                 "Upload a General MIDI drum track exported from your DAW or drum sequencer. "
-                "Common notes: kick MIDI 36 (C1/C2), snare MIDI 38 (D1/D2), closed hat MIDI 42 "
-                "(F#1/F#2). Other mapped percussion goes to the Perc lane."
+                "Use MIDI note numbers as the source of truth: kick 36, snare 38, closed hat 42. "
+                "Your DAW may label those as C1/D1/F#1 or C2/D2/F#2 depending on octave numbering."
             ),
             key="drum_midi_file",
         )
@@ -622,8 +622,8 @@ with left:
                 1.0,
                 0.05,
                 help=(
-                    "Gain for General MIDI kick notes 35/36, often B0/C1 or B1/C2 depending "
-                    "on your DAW octave display."
+                    "Gain for General MIDI kick notes 35/36. Your DAW may display MIDI 36 as "
+                    "C1 or C2 depending on octave numbering."
                 ),
             )
             snare_gain = st.slider(

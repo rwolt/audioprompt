@@ -80,14 +80,14 @@ Filename tagging
   - Tags: r = root, s = scale, mb = melody BPM, ms = melody/noise seed, db = drum BPM, ds = drum seed. Focus appears only when enabled, e.g. f-voc or f-b120-3200. Character appears only when non-neutral, e.g. ch-voice.
 
 MIDI Drum Map (General MIDI -> lanes)
-- AudioPrompt follows General MIDI drum notes. DAWs disagree about octave labels: MIDI 36 may show as C1 in Logic, but C2 in some other tools. The MIDI number is the source of truth.
-| MIDI notes | Common piano-roll names | Lane | Typical source |
+- AudioPrompt follows General MIDI drum note numbers. Use the MIDI number as the source of truth: octave labels vary by DAW, so MIDI 36 may appear as C1, C2, or another octave label depending on the piano-roll setting.
+| MIDI notes | Possible piano-roll labels | Lane | Typical source |
 |------------|-------------------------|------|----------------|
-| 35, 36 | B0/C1 or B1/C2 | kick | Acoustic Kick, Bass Drum |
-| 37, 38, 39, 40 | C#1/D1/D#1/E1 or C#2/D2/D#2/E2 | snare | Side Stick, Acoustic Snare, Clap, Electric Snare |
-| 41, 43, 45, 47, 48, 50 | F1-G#1-A#1-B1-D2 or one octave higher | snare | Tom notes currently share the snare/body lane |
-| 42, 44, 46 | F#1/G#1/A#1 or F#2/G#2/A#2 | hat | Closed, Pedal, Open Hi-Hat |
-| 49, 51, 52, 55, 57, 59 | C#2/D#2/E2/G2/A2/B2 or one octave higher | hat | Crash/Ride/Splash cymbals share the hat lane |
+| 35, 36 | Often B0/C1 or B1/C2 | kick | Acoustic Kick, Bass Drum |
+| 37, 38, 39, 40 | Often C#1/D1/D#1/E1 or C#2/D2/D#2/E2 | snare | Side Stick, Acoustic Snare, Clap, Electric Snare |
+| 41, 43, 45, 47, 48, 50 | Toms; labels vary by octave setting | snare | Tom notes currently share the snare/body lane |
+| 42, 44, 46 | Often F#1/G#1/A#1 or F#2/G#2/A#2 | hat | Closed, Pedal, Open Hi-Hat |
+| 49, 51, 52, 55, 57, 59 | Cymbals; labels vary by octave setting | hat | Crash/Ride/Splash cymbals share the hat lane |
 | 54, 56, 58, 62-85 | varies | perc | Tambourine, Cowbell, Congas, Bongos, Claves, etc. |
 - Any note not in the table goes to the perc lane so unexpected drum hits still make sound.
 - The parser reads all tracks because some DAWs export drums across multiple tracks.
