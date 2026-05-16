@@ -27,6 +27,30 @@ SCALES = {
     "chromatic": list(range(12)),
 }
 
+CHARACTERISTIC_INTERVALS = {
+    "major": [4, 11],
+    "natural_minor": [3, 8],
+    "dorian": [3, 9],
+    "mixolydian": [4, 10],
+    "pentatonic": [3, 7],
+    "harmonic_minor": [3, 8, 11],
+    "minor_pentatonic": [3, 7],
+    "major_pentatonic": [4, 9],
+    "minor_blues": [3, 6],
+    "major_blues": [3, 4],
+    "lydian": [4, 6],
+    "phrygian": [1, 3],
+    "aeolian": [3, 8],
+    "locrian": [1, 6],
+    "melodic_minor": [3, 9, 11],
+    "harmonic_major": [4, 8, 11],
+    "double_harmonic": [1, 4, 8, 11],
+    "whole_tone": [4, 8],
+    "octatonic_whole_half": [3, 6, 9],
+    "octatonic_half_whole": [1, 4, 7],
+    "chromatic": [],
+}
+
 NOTE_TO_MIDI = {
     "C": 60, "C#": 61, "Db": 61, "D": 62, "D#": 63, "Eb": 63, "E": 64, "F": 65,
     "F#": 66, "Gb": 66, "G": 67, "G#": 68, "Ab": 68, "A": 69, "A#": 70, "Bb": 70, "B": 71
@@ -67,21 +91,75 @@ def generate_random_melody(
     spb = 60.0 / bpm
     t, t_end = 0.0, duration_s
     events = []
-    current_idx = rng.integers(0, len(allowed))
+    
+    root_midi_class = NOTE_TO_MIDI[root] % 12
+    root_indices = [i for i, m in enumerate(allowed) if m % 12 == root_midi_class]
+    
+    if root_indices:
+        current_idx = root_indices[0] if len(root_indices) == 1 else root_indices[len(root_indices) // 2 - 1]
+    else:
+        current_idx = rng.integers(0, len(allowed))
+
+    # Build Intro Motif
+    char_ivs = CHARACTERISTIC_INTERVALS.get(scale, [])
+    scale_pattern = SCALES.get(scale, [])
+    char_offsets = [scale_pattern.index(iv) for iv in char_ivs if iv in scale_pattern]
+    
+    if not char_offsets:
+        char_offsets = [len(scale_pattern) // 3, len(scale_pattern) * 2 // 3]
+
+    motif_offsets = [0]
+    if len(char_offsets) >= 1:
+        motif_offsets.append(char_offsets[0])
+    if len(char_offsets) >= 2:
+        motif_offsets.append(char_offsets[-1])
+    else:
+        motif_offsets.append(len(scale_pattern) // 2)
+    
+    motif_queue = []
+    for offset in motif_offsets:
+        target_idx = current_idx + offset
+        if 0 <= target_idx < len(allowed):
+            motif_queue.append(target_idx)
+
     while t < t_end - 1e-6:
         db = rng.choice(durations_beats, p=duration_probs)
         dur = min(db * spb, t_end - t)
-        if rng.random() < rest_prob:
+        
+        if rng.random() < rest_prob and not motif_queue:
             events.append((t, t + dur, None))
         else:
-            if rng.random() < step_bias:
-                step = rng.choice([-1, 1])
-                ni = np.clip(current_idx + step, 0, len(allowed) - 1)
+            if motif_queue:
+                ni = motif_queue.pop(0)
             else:
-                leap = rng.integers(-leap_max_scale_steps, leap_max_scale_steps + 1)
-                if leap == 0:
-                    leap = rng.choice([-1, 1])
-                ni = np.clip(current_idx + leap, 0, len(allowed) - 1)
+                if rng.random() < step_bias:
+                    step = rng.choice([-1, 1])
+                    ni = np.clip(current_idx + step, 0, len(allowed) - 1)
+                else:
+                    min_leap = max(-leap_max_scale_steps, -current_idx)
+                    max_leap = min(leap_max_scale_steps, len(allowed) - 1 - current_idx)
+                    if min_leap < max_leap:
+                        possible_targets = list(range(current_idx + min_leap, current_idx + max_leap + 1))
+                        if current_idx in possible_targets:
+                            possible_targets.remove(current_idx)
+                        if possible_targets:
+                            weights = []
+                            for target in possible_targets:
+                                iv = (allowed[target] - root_midi_class) % 12
+                                if iv == 0:
+                                    weights.append(3.0)
+                                elif iv in char_ivs:
+                                    weights.append(2.0)
+                                else:
+                                    weights.append(1.0)
+                            weights = np.array(weights)
+                            weights /= weights.sum()
+                            ni = rng.choice(possible_targets, p=weights)
+                        else:
+                            ni = current_idx
+                    else:
+                        ni = current_idx
+            
             current_idx = int(ni)
             events.append((t, t + dur, int(allowed[current_idx])))
         t += dur
