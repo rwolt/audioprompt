@@ -122,21 +122,52 @@ def imprint_melody_focus(
     return y.astype(np.float32)
 
 
-def rhythmic_gate_from_events(events, sr: int, n_samples: int, attack: float = 0.01, release: float = 0.03):
+def rhythmic_gate_from_events(events, sr: int, n_samples: int, shape: str = "natural", decay_mult: float = 1.0):
     env = np.zeros(n_samples, dtype=float)
     for (t0, t1, midi) in events:
+        if midi is None:
+            continue
         s0 = int(np.round(t0 * sr))
         s1 = int(np.round(t1 * sr))
         s0 = max(0, min(n_samples - 1, s0))
         s1 = max(0, min(n_samples, s1))
         if s1 <= s0:
             continue
-        a = max(1, int(attack * sr))
-        r = max(1, int(release * sr))
-        seg = np.ones(s1 - s0, dtype=float)
-        seg[: min(a, len(seg))] *= np.linspace(0, 1, num=min(a, len(seg)), endpoint=False)
-        if r < len(seg):
-            seg[-r:] *= np.linspace(1, 0, num=r, endpoint=True)
+            
+        dur_s = (s1 - s0) / sr
+        t_rel = np.linspace(0, dur_s, s1 - s0, endpoint=False)
+        
+        if shape == "pluck":
+            tau = 0.08 * decay_mult
+            seg = np.exp(-t_rel / max(tau, 0.001))
+            a_samples = int(0.002 * sr)
+            if a_samples > 0 and a_samples < len(seg):
+                seg[:a_samples] *= np.linspace(0, 1, a_samples)
+        elif shape == "tight":
+            tau = 0.15 * decay_mult
+            seg = np.exp(-t_rel / max(tau, 0.001))
+            a_samples = int(0.005 * sr)
+            if a_samples > 0 and a_samples < len(seg):
+                seg[:a_samples] *= np.linspace(0, 1, a_samples)
+        elif shape == "smooth":
+            seg = np.ones_like(t_rel)
+            a_samples = min(int(0.08 * sr), len(seg)//2)
+            r_samples = min(int(0.08 * sr), len(seg)//2)
+            if a_samples > 0:
+                seg[:a_samples] *= np.linspace(0, 1, a_samples)
+            if r_samples > 0:
+                seg[-r_samples:] *= np.linspace(1, 0, r_samples)
+        else: # natural
+            tau = 0.5 * decay_mult
+            seg = np.exp(-t_rel / max(tau, 0.001))
+            seg = np.maximum(seg, 0.5 * np.ones_like(seg)) # Sustain level
+            a_samples = min(int(0.01 * sr), len(seg)//2)
+            r_samples = min(int(0.03 * sr), len(seg)//2)
+            if a_samples > 0:
+                seg[:a_samples] *= np.linspace(0, 1, a_samples)
+            if r_samples > 0:
+                seg[-r_samples:] *= np.linspace(1, 0, r_samples)
+
         env[s0:s1] = np.maximum(env[s0:s1], seg)
     return env
 

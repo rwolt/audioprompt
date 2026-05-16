@@ -407,14 +407,8 @@ def build_prompt(
 
     if enable_gate and events is not None:
         shape = (character_params or {}).get("note_shape", "natural")
-        gate_shapes = {
-            "tight": (0.004, 0.018),
-            "pluck": (0.002, 0.012),
-            "smooth": (0.02, 0.08),
-            "natural": (0.01, 0.03),
-        }
-        attack, release = gate_shapes.get(shape, gate_shapes["natural"])
-        gate = rhythmic_gate_from_events(events, sr, n_samples=n, attack=attack, release=release)
+        decay_mult = float((character_params or {}).get("note_decay", 1.0))
+        gate = rhythmic_gate_from_events(events, sr, n_samples=n, shape=shape, decay_mult=decay_mult)
         y_prompt = (y_prompt * (0.15 + 0.85 * gate)).astype(np.float32)
 
     if enable_melody and melody_params.get("drone_level", 0.0) > 0.0:
@@ -542,7 +536,7 @@ with left:
         with col2:
             vib_hz = st.slider("Vibrato Hz", 3.0, 9.0, 5.5, 0.1, help="Rate of pitch modulation.")
         vib_depth = st.slider("Vibrato depth", 0.0, 0.05, 0.02, 0.001, help="Depth of pitch modulation (fraction).")
-        ccol1, ccol2 = st.columns(2, gap="small")
+        ccol1, ccol2, ccol3 = st.columns(3, gap="small")
         with ccol1:
             melody_character = st.selectbox(
                 "Melody character",
@@ -560,9 +554,15 @@ with left:
                 options=["natural", "tight", "pluck", "smooth"],
                 index=0,
                 help=(
-                    "Shapes how strongly each melody note appears in the noise. "
-                    "Tight and pluck are shorter; smooth has a softer envelope."
+                    "Shapes the base envelope for the melody notes. "
+                    "Tight and pluck have exponential decays; smooth has a softer attack."
                 ),
+            )
+        with ccol3:
+            note_decay = st.slider(
+                "Note decay",
+                0.1, 3.0, 1.0, 0.1,
+                help="Scales the length of the note envelope decay. Lower = shorter, staccato notes."
             )
 
         with st.expander("Melody – Advanced", expanded=False):
@@ -588,6 +588,7 @@ with left:
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
         melody_character, note_shape = "neutral", "natural"
+        note_decay = 1.0
 
     # Add ~36px top margin before Drum header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -856,6 +857,7 @@ with right:
     character_params = dict(
         character="neutral" if melody_character == "wide" else melody_character,
         note_shape=note_shape,
+        note_decay=float(note_decay),
         detune_spread_cents=7.0 if melody_character == "wide" else 0.0,
     )
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
