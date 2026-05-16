@@ -417,6 +417,23 @@ def build_prompt(
         gate = rhythmic_gate_from_events(events, sr, n_samples=n, attack=attack, release=release)
         y_prompt = (y_prompt * (0.15 + 0.85 * gate)).astype(np.float32)
 
+    if enable_melody and melody_params.get("drone_level", 0.0) > 0.0:
+        from audioprompt_core.melody import NOTE_TO_MIDI, midi_to_hz
+        root_midi = NOTE_TO_MIDI.get(melody_params["root"], 60)
+        drone_hz = midi_to_hz(root_midi - 24) # Two octaves down for bass drone
+        t_arr = np.arange(n) / sr
+        # Blend sine and pseudo-triangle for a warm tone
+        drone_wave = 0.5 * np.sin(2 * np.pi * drone_hz * t_arr)
+        drone_wave += 0.25 * np.arcsin(np.sin(2 * np.pi * drone_hz * t_arr))
+        # Simple fade to avoid clicks
+        fade_len = min(int(sr * 0.1), n // 2)
+        if fade_len > 0:
+            fade_env = np.ones(n, dtype=np.float32)
+            fade_env[:fade_len] = np.linspace(0, 1, fade_len)
+            fade_env[-fade_len:] = np.linspace(1, 0, fade_len)
+            drone_wave *= fade_env
+        y_prompt = y_prompt + (drone_wave * float(melody_params["drone_level"]) * 0.5).astype(np.float32)
+
     # Normalize
     peak = float(np.max(np.abs(y_prompt)) + 1e-12)
     if peak > 0:
@@ -559,6 +576,7 @@ with left:
                 leap_steps = st.slider("Max leap (scale steps)", 1, 8, 7, 1, help="Largest jump when not stepping.")
                 glide_frac = st.slider("Glide frac", 0.0, 0.9, 0.35, 0.01, help="Portion of the note duration spent gliding.")
             rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.12, 0.01, help="Chance of rests vs notes.")
+            drone_level = st.slider("Root drone level", 0.0, 1.0, 0.0, 0.05, help="Subtle sustained drone on the root note beneath the melody.")
     else:
         # Provide defaults when melody disabled to keep variables defined
         melody_root = "E"
@@ -566,6 +584,7 @@ with left:
         bpm = 96
         low_midi, high_midi = 55, 79
         step_bias, leap_steps, rest_prob = 0.5, 7, 0.12
+        drone_level = 0.0
         glide_prob, glide_frac = 0.25, 0.35
         vib_hz, vib_depth = 5.5, 0.02
         melody_character, note_shape = "neutral", "natural"
@@ -826,6 +845,7 @@ with right:
         step_bias=step_bias,
         leap_steps=leap_steps,
         rest_prob=rest_prob,
+        drone_level=float(drone_level),
         durations=(0.25, 0.5, 1.0),
         duration_probs=(0.25, 0.5, 0.25),
         glide_prob=glide_prob,
