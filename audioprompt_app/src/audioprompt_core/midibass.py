@@ -26,7 +26,7 @@ def inspect_bass_midi_timing(midi_bytes: bytes) -> dict:
     return {"bpm": bpm, "length_s": length_s}
 
 
-def parse_midi_bass_events(midi_bytes: bytes) -> Tuple[List[Tuple[float, float, int, float]], List[Tuple[float, float]], float]:
+def parse_midi_bass_events(midi_bytes: bytes, pitch_bend_range: float = 12.0) -> Tuple[List[Tuple[float, float, int, float]], List[Tuple[float, float]], float]:
     """
     Parses a MIDI file to extract bass note events and pitch bend.
     Returns:
@@ -54,9 +54,7 @@ def parse_midi_bass_events(midi_bytes: bytes) -> Tuple[List[Tuple[float, float, 
     best_track_events = []
     best_track_bends = []
     
-    # Logic's EXS24 / Sampler typically uses a 12 semitone bend range for bass slides,
-    # but GM uses 2. We'll use 12 since large slides are common in Logic basslines.
-    pitch_bend_range_semitones = 12.0 
+    pitch_bend_range_semitones = float(pitch_bend_range) 
     
     for track in midi_file.tracks:
         current_time_s = 0.0

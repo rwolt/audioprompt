@@ -828,11 +828,13 @@ with left:
                 help="Base envelope shape before Decay offset and velocity are applied.",
             )
             
-        bcol3, bcol4 = st.columns(2, gap="small")
+        bcol3, bcol4, bcol5 = st.columns(3, gap="small")
         with bcol3:
             bass_level = st.slider("Bass level", 0.0, 2.0, 1.0, 0.05, help="Gain for the bass layer.")
         with bcol4:
             bass_decay_offset = st.slider("Decay offset", 0.1, 3.0, 1.0, 0.1, help="Scales the length of the bass note envelope decay.")
+        with bcol5:
+            bass_pb_range = st.slider("Pitch bend range", 1, 48, 12, 1, help="Matches the pitch wheel range of the virtual instrument that generated the MIDI (Logic slides often use 12, 24, or 48 semitones).")
             
         btempo1, btempo2 = st.columns(2, gap="small")
         with btempo1:
@@ -873,7 +875,7 @@ with left:
         )
     else:
         bass_character, bass_note_shape = "Fingerstyle", "natural"
-        bass_level, bass_decay_offset = 1.0, 1.0
+        bass_level, bass_decay_offset, bass_pb_range = 1.0, 1.0, 12
         match_melody_bpm_bass, loop_bass = True, True
         bass_bpm = int(bpm)
 
@@ -1195,7 +1197,7 @@ with right:
                 if enable_bass and bass_midi_file is not None:
                     try:
                         bass_seed_used = seed_to_use + 2
-                        bass_events, bass_bends, detected_bass_bpm = parse_midi_bass_events(bass_midi_file.getvalue())
+                        bass_events, bass_bends, detected_bass_bpm = parse_midi_bass_events(bass_midi_file.getvalue(), pitch_bend_range=float(bass_pb_range))
                         target_bass_bpm = float(bpm) if match_melody_bpm_bass else float(bass_bpm)
                         bass_speed_mult = target_bass_bpm / max(float(detected_bass_bpm), 1e-6)
                         _log_debug(
