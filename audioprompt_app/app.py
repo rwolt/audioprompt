@@ -38,6 +38,13 @@ from audioprompt_core.mididrums import (
     loop_lane_events,
     LANES,
 )
+from audioprompt_core.midibass import (
+    inspect_bass_midi_timing,
+    parse_midi_bass_events,
+    scale_bass_events,
+    loop_bass_events,
+    bass_events_to_f0,
+)
 from audioprompt_core.drumnoise import (
     build_drum_tone_params,
     synthesize_drum_layer,
@@ -103,6 +110,8 @@ def _clear_outputs():
         "combined_name",
         "drum_prompt_bytes",
         "drum_prompt_key",
+        "bass_prompt_bytes",
+        "bass_prompt_key",
     ):
         try:
             st.session_state.pop(k, None)
@@ -135,6 +144,24 @@ def _inspect_uploaded_drum_midi(uploaded_file) -> dict | None:
     st.session_state["detected_drum_bpm_preview"] = timing["bpm"] if timing else None
     if timing is not None:
         st.session_state["drum_bpm_value"] = int(round(float(timing["bpm"])))
+    return timing
+
+def _inspect_uploaded_bass_midi(uploaded_file) -> dict | None:
+    if uploaded_file is None:
+        return None
+    sig = _upload_signature(uploaded_file)
+    if st.session_state.get("_bass_bpm_sig") == sig:
+        return st.session_state.get("bass_timing_preview")
+    try:
+        timing = inspect_bass_midi_timing(uploaded_file.getvalue())
+    except Exception as e:
+        _log_debug(f"[bass] BPM preview failed: {e}")
+        timing = None
+    st.session_state["_bass_bpm_sig"] = sig
+    st.session_state["bass_timing_preview"] = timing
+    st.session_state["detected_bass_bpm_preview"] = timing["bpm"] if timing else None
+    if timing is not None:
+        st.session_state["bass_bpm_value"] = int(round(float(timing["bpm"])))
     return timing
 
 
@@ -753,6 +780,103 @@ with left:
         drum_lane_gains = {"kick": 1.0, "snare": 0.9, "hat": 0.7, "perc": 0.5}
         drum_character, snare_tune, drum_decay = "clean", 0, 1.0
 
+    st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
+    st.subheader("Bass MIDI Imprint")
+    enable_bass = st.checkbox(
+        "Enable bass MIDI imprint",
+        value=False,
+        help="Upload a MIDI bassline to generate a nuanced, pitch-sliding bass layer.",
+    )
+    bass_midi_file = None
+    bass_timing_preview = None
+    if enable_bass:
+        bass_midi_file = st.file_uploader(
+            "Bass MIDI (.mid / .midi)",
+            type=["mid", "midi"],
+            accept_multiple_files=False,
+            help=(
+                "Upload a bass track. Pitch bend and note velocity will be preserved and imprinted."
+            ),
+            key="bass_midi_file",
+        )
+        if bass_midi_file is not None:
+            st.caption(f"Uploaded: {bass_midi_file.name}")
+            bass_timing_preview = _inspect_uploaded_bass_midi(bass_midi_file)
+            if bass_timing_preview is not None:
+                st.caption(
+                    f"Detected bass MIDI: {bass_timing_preview['bpm']:g} BPM, "
+                    f"{bass_timing_preview['length_s']:.2f} sec"
+                )
+        else:
+            st.session_state.pop("y_bass", None)
+            st.session_state.pop("bass_timing_preview", None)
+            st.session_state.pop("_bass_bpm_sig", None)
+
+        bcol1, bcol2 = st.columns(2, gap="small")
+        with bcol1:
+            bass_character = st.selectbox(
+                "Bass character",
+                options=["Upright", "Fingerstyle", "Picked", "Synth", "Sub"],
+                index=1,
+                help="Changes the harmonic balance and frequency band to emulate different bass tones.",
+            )
+        with bcol2:
+            bass_note_shape = st.selectbox(
+                "Note shape base",
+                options=["natural", "tight", "pluck", "smooth"],
+                index=0,
+                help="Base envelope shape before Decay offset and velocity are applied.",
+            )
+            
+        bcol3, bcol4 = st.columns(2, gap="small")
+        with bcol3:
+            bass_level = st.slider("Bass level", 0.0, 2.0, 1.0, 0.05, help="Gain for the bass layer.")
+        with bcol4:
+            bass_decay_offset = st.slider("Decay offset", 0.1, 3.0, 1.0, 0.1, help="Scales the length of the bass note envelope decay.")
+            
+        btempo1, btempo2 = st.columns(2, gap="small")
+        with btempo1:
+            match_melody_bpm_bass = st.checkbox(
+                "Match melody BPM (Bass)",
+                value=True,
+                help="Use the melody BPM for the bass layer.",
+            )
+            detected_bpm_for_reset_bass = st.session_state.get("detected_bass_bpm_preview")
+            if st.button(
+                "Use detected BPM",
+                disabled=detected_bpm_for_reset_bass is None,
+                help="Reset Independent bass BPM to the tempo detected in the uploaded MIDI file.",
+                key="btn_bass_bpm_reset"
+            ):
+                st.session_state["bass_bpm_value"] = int(round(float(detected_bpm_for_reset_bass)))
+        with btempo2:
+            bass_bpm = st.slider(
+                "Independent bass BPM",
+                40,
+                220,
+                value=int(st.session_state.get("bass_bpm_value", bpm)),
+                step=1,
+                key="bass_bpm_value",
+                disabled=match_melody_bpm_bass,
+            )
+            bass_bpm = int(st.session_state.get("bass_bpm_value", bass_bpm))
+            
+        target_bass_bpm_preview = float(bpm) if match_melody_bpm_bass else float(bass_bpm)
+        matched_bass_seconds = _matched_drum_length_seconds(bass_timing_preview, target_bass_bpm_preview)
+        if matched_bass_seconds is not None:
+            st.caption(f"Matched bass length: {matched_bass_seconds:.2f} sec at {target_bass_bpm_preview:g} BPM")
+            
+        loop_bass = st.checkbox(
+            "Loop bass to prompt length",
+            value=True,
+            help="Repeats the bass MIDI when the prompt is longer than the MIDI region.",
+        )
+    else:
+        bass_character, bass_note_shape = "Fingerstyle", "natural"
+        bass_level, bass_decay_offset = 1.0, 1.0
+        match_melody_bpm_bass, loop_bass = True, True
+        bass_bpm = int(bpm)
+
     # Add ~36px top margin before Focus header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
     # Focus (left) — for future tabs, keep flat containers
@@ -896,31 +1020,40 @@ with right:
 
         # Output & Seed just beneath Generate (no separate heading to reduce clutter)
         can_match_drum_length = enable_drum and drum_midi_file is not None and matched_drum_seconds is not None
+        can_match_bass_length = enable_bass and bass_midi_file is not None and matched_bass_seconds is not None
+        
+        prompt_len_opts = ["Manual seconds"]
         if can_match_drum_length:
+            prompt_len_opts.insert(0, "Match drum MIDI")
+        if can_match_bass_length:
+            prompt_len_opts.insert(0, "Match bass MIDI")
+            
+        if len(prompt_len_opts) > 1:
             prompt_length_mode = st.radio(
                 "Prompt length",
-                options=["Match drum MIDI", "Manual seconds"],
+                options=prompt_len_opts,
                 index=0,
                 horizontal=True,
-                help=(
-                    "Match drum MIDI uses the uploaded MIDI region length, adjusted to the target drum BPM. "
-                    "Manual uses the seconds slider."
-                ),
+                help="Match length to uploaded MIDI regions (adjusted to target BPM) or use manual seconds.",
             )
         else:
             prompt_length_mode = "Manual seconds"
+            
         manual_prompt_seconds = st.slider(
-            "Manual seconds" if can_match_drum_length else "Prompt seconds",
+            "Manual seconds" if len(prompt_len_opts) > 1 else "Prompt seconds",
             1.0,
             20.0,
             4.0,
             0.5,
-            disabled=can_match_drum_length and prompt_length_mode != "Manual seconds",
+            disabled=prompt_length_mode != "Manual seconds",
             help="Length of the generated prompt when Prompt length is set to Manual seconds.",
         )
         if prompt_length_mode == "Match drum MIDI" and matched_drum_seconds is not None:
             prompt_seconds = float(matched_drum_seconds)
             st.caption(f"Prompt length matched to drum MIDI: {prompt_seconds:.2f} sec")
+        elif prompt_length_mode == "Match bass MIDI" and matched_bass_seconds is not None:
+            prompt_seconds = float(matched_bass_seconds)
+            st.caption(f"Prompt length matched to bass MIDI: {prompt_seconds:.2f} sec")
         else:
             prompt_seconds = float(manual_prompt_seconds)
         st.markdown("**Prompt Level**")
@@ -954,7 +1087,7 @@ with right:
 
         # Blend controls — always visible so the user can tune the mix
         st.markdown("**Layer Blend**")
-        bl1, bl2 = st.columns(2, gap="small")
+        bl1, bl2, bl3 = st.columns(3, gap="small")
         with bl1:
             melody_blend_gain = st.slider(
                 "Melody level",
@@ -966,6 +1099,12 @@ with right:
                 "Drum level",
                 0.0, 2.0, 1.0, 0.05,
                 help="Gain for the drum MIDI layer.",
+            )
+        with bl3:
+            bass_blend_gain = st.slider(
+                "Bass blend",
+                0.0, 2.0, 1.0, 0.05,
+                help="Gain for the bass MIDI layer.",
             )
 
         # (Outputs header and preview toggle appear below, just before outputs)
@@ -1050,6 +1189,100 @@ with right:
                     st.session_state.pop("y_drum", None)
                     st.session_state.pop("drum_bpm", None)
                     st.session_state.pop("detected_drum_bpm", None)
+                    
+                # Bass MIDI prompt
+                bass_seed_used = None
+                if enable_bass and bass_midi_file is not None:
+                    try:
+                        bass_seed_used = seed_to_use + 2
+                        bass_events, bass_bends, detected_bass_bpm = parse_midi_bass_events(bass_midi_file.getvalue())
+                        target_bass_bpm = float(bpm) if match_melody_bpm_bass else float(bass_bpm)
+                        bass_speed_mult = target_bass_bpm / max(float(detected_bass_bpm), 1e-6)
+                        _log_debug(
+                            f"[gen] bass MIDI parsed: {detected_bass_bpm} BPM; target={target_bass_bpm:.1f} BPM"
+                        )
+                        if abs(float(bass_speed_mult) - 1.0) > 1e-6:
+                            bass_events, bass_bends = scale_bass_events(bass_events, bass_bends, float(bass_speed_mult))
+                            _log_debug(f"[gen] bass BPM scaled by {bass_speed_mult:.3f}x")
+                        if loop_bass:
+                            bass_events, bass_bends = loop_bass_events(bass_events, bass_bends, float(prompt_seconds))
+                            _log_debug("[gen] bass events looped to prompt length")
+                            
+                        # Generate pitch trajectory from bass events
+                        n_samples = int(sr * prompt_seconds)
+                        bass_f0 = bass_events_to_f0(bass_events, bass_bends, sr, n_samples)
+                        
+                        # Apply timbre based on preset
+                        bass_char_params = {"character": "neutral", "note_shape": bass_note_shape, "note_decay": float(bass_decay_offset)}
+                        bass_imprint_params = {"gain": 8.0, "harmonics": 10, "bw_frac": 0.01, "floor_db": -24.0, "sharpness": 12, "n_fft": 2048}
+                        bass_focus = (40, 800)
+                        
+                        if bass_character == "Upright":
+                            bass_focus = (40, 800)
+                            bass_char_params["character"] = "warm"
+                            bass_char_params["note_shape"] = bass_note_shape if bass_note_shape != "natural" else "pluck"
+                            bass_imprint_params["harmonics"] = 6
+                        elif bass_character == "Picked":
+                            bass_focus = (40, 5000)
+                            bass_char_params["character"] = "bright"
+                            bass_char_params["note_shape"] = bass_note_shape if bass_note_shape != "natural" else "tight"
+                            bass_imprint_params["harmonics"] = 15
+                        elif bass_character == "Fingerstyle":
+                            bass_focus = (40, 2000)
+                            bass_char_params["character"] = "neutral"
+                            bass_char_params["note_shape"] = bass_note_shape if bass_note_shape != "natural" else "natural"
+                            bass_imprint_params["harmonics"] = 8
+                        elif bass_character == "Sub":
+                            bass_focus = (30, 200)
+                            bass_char_params["character"] = "warm"
+                            bass_char_params["note_shape"] = bass_note_shape if bass_note_shape != "natural" else "smooth"
+                            bass_imprint_params["harmonics"] = 3
+                        elif bass_character == "Synth":
+                            bass_focus = (30, 3000)
+                            bass_char_params["character"] = "reed"
+                            bass_char_params["note_shape"] = bass_note_shape if bass_note_shape != "natural" else "smooth"
+                            bass_imprint_params["harmonics"] = 12
+                            
+                        x_bass = pink_noise(n_samples, sr, seed=bass_seed_used)
+                        y_bass = imprint_melody_focus(
+                            x_bass,
+                            sr,
+                            f0_hz=bass_f0,
+                            gain=bass_imprint_params["gain"],
+                            harmonics=bass_imprint_params["harmonics"],
+                            bw_frac=bass_imprint_params["bw_frac"],
+                            focus=bass_focus,
+                            band_floor_db=bass_imprint_params["floor_db"],
+                            sharpness=bass_imprint_params["sharpness"],
+                            n_fft=bass_imprint_params["n_fft"],
+                            character=bass_char_params["character"],
+                        )
+                        
+                        # Apply velocity-sensitive rhythmic gate
+                        bass_gate = rhythmic_gate_from_events(
+                            bass_events, sr, n_samples=n_samples, shape=bass_char_params["note_shape"], decay_mult=bass_char_params["note_decay"]
+                        )
+                        y_bass = (y_bass * (0.05 + 0.95 * bass_gate)).astype(np.float32)
+                        
+                        # Normalize bass layer
+                        peak = float(np.max(np.abs(y_bass)) + 1e-12)
+                        if peak > 0:
+                            y_bass = (y_bass / peak).astype(np.float32)
+                            
+                        st.session_state["y_bass"] = y_bass
+                        st.session_state["bass_bpm"] = round(float(target_bass_bpm), 1)
+                        st.session_state["detected_bass_bpm"] = round(float(detected_bass_bpm), 1)
+                        _log_debug(f"[gen] bass layer: len={len(y_bass)}, peak={np.max(np.abs(y_bass)):.4f}")
+                    except Exception as e:
+                        _log_debug(f"[gen] bass error: {e}")
+                        st.error(f"Failed to parse bass MIDI. Make sure you uploaded a valid .mid/.midi file.\nError: {e}")
+                        st.session_state.pop("y_bass", None)
+                        bass_seed_used = None
+                else:
+                    st.session_state.pop("y_bass", None)
+                    st.session_state.pop("bass_bpm", None)
+                    st.session_state.pop("detected_bass_bpm", None)
+
                 st.session_state["download_meta"] = {
                     "root": melody_root if enable_melody else "none",
                     "scale": _scale_tag(melody_scale, bool(enable_melody)),
@@ -1057,6 +1290,8 @@ with right:
                     "melody_seed": seed_to_use,
                     "drum_bpm": target_drum_bpm if drum_seed_used is not None else None,
                     "drum_seed": drum_seed_used,
+                    "bass_bpm": target_bass_bpm if bass_seed_used is not None else None,
+                    "bass_seed": bass_seed_used,
                     "length_s": prompt_seconds,
                     "focus": _focus_tag(
                         bool(enable_focus),
@@ -1075,21 +1310,23 @@ with right:
             y_prompt_local = st.session_state["y_prompt"]
             sr_prompt_local = int(st.session_state.get("prompt_sr", int(sr)))
 
-            # Blend melody + drum if drum layer exists (with user-controlled gains)
+            # Blend melody + drum + bass if they exist
+            y_render = (y_prompt_local * float(melody_blend_gain)).astype(np.float32)
+            
             if "y_drum" in st.session_state:
                 y_drum_local = st.session_state["y_drum"]
-                min_len = min(len(y_prompt_local), len(y_drum_local))
-                m_gain = float(melody_blend_gain)
-                d_gain = float(drum_blend_gain)
-                y_blend = (y_prompt_local[:min_len] * m_gain) + (y_drum_local[:min_len] * d_gain)
-                peak = float(np.max(np.abs(y_blend)) + 1e-12)
-                if peak > 0:
-                    y_blend = (y_blend / peak).astype(np.float32)
-                y_render = y_blend
-                _log_debug(f"[render] blend m={m_gain:.2f} d={d_gain:.2f}; peak after norm={np.max(np.abs(y_render)):.4f}")
-            else:
-                y_render = (y_prompt_local * float(melody_blend_gain)).astype(np.float32)
-                _log_debug(f"[render] melody only, gain={float(melody_blend_gain):.2f}")
+                min_len = min(len(y_render), len(y_drum_local))
+                y_render = y_render[:min_len] + (y_drum_local[:min_len] * float(drum_blend_gain))
+                
+            if "y_bass" in st.session_state:
+                y_bass_local = st.session_state["y_bass"]
+                min_len = min(len(y_render), len(y_bass_local))
+                y_render = y_render[:min_len] + (y_bass_local[:min_len] * float(bass_blend_gain))
+                
+            peak = float(np.max(np.abs(y_render)) + 1e-12)
+            if peak > 0:
+                y_render = (y_render / peak).astype(np.float32)
+            _log_debug(f"[render] final blend peak after norm={np.max(np.abs(y_render)):.4f}")
 
             # File naming for prompt/combined
             seed_val_local = int(st.session_state.get("seed_used", st.session_state.get("seed", 7)))
@@ -1103,6 +1340,8 @@ with right:
                     "melody_seed": seed_val_local,
                     "drum_bpm": st.session_state.get("drum_bpm") if "y_drum" in st.session_state else None,
                     "drum_seed": seed_val_local + 1 if "y_drum" in st.session_state else None,
+                    "bass_bpm": st.session_state.get("bass_bpm") if "y_bass" in st.session_state else None,
+                    "bass_seed": seed_val_local + 2 if "y_bass" in st.session_state else None,
                     "length_s": prompt_seconds,
                     "focus": _focus_tag(
                         bool(enable_focus),
@@ -1124,16 +1363,27 @@ with right:
                     st.caption(f"Drum layer: {drum_bpm_display} BPM (detected {detected_bpm_display} BPM)")
                 else:
                     st.caption(f"Drum layer: {drum_bpm_display} BPM")
+            if "y_bass" in st.session_state:
+                bass_bpm_display = st.session_state.get("bass_bpm", "—")
+                detected_bass_bpm_display = st.session_state.get("detected_bass_bpm")
+                if detected_bass_bpm_display is not None:
+                    st.caption(f"Bass layer: {bass_bpm_display} BPM (detected {detected_bass_bpm_display} BPM)")
+                else:
+                    st.caption(f"Bass layer: {bass_bpm_display} BPM")
             st.markdown("**Prompt**")
             prompt_key_now = (
                 "prompt",
                 int(sr_prompt_local),
                 int(seed_val_local),
                 bool(enable_drum),
+                bool(enable_bass),
                 round(float(melody_blend_gain), 3),
                 round(float(drum_blend_gain), 3),
+                round(float(bass_blend_gain), 3),
                 round(float(st.session_state.get("drum_bpm", drum_bpm)), 3),
+                round(float(st.session_state.get("bass_bpm", bass_bpm)), 3),
                 bool(loop_drums),
+                bool(loop_bass),
                 round(float(prompt_seconds), 3),
             )
             if st.session_state.get("prompt_key") != prompt_key_now or "prompt_bytes" not in st.session_state:
@@ -1199,10 +1449,14 @@ with right:
                         int(fade_in_ms), int(fade_out_ms),
                         getattr(uploaded, "name", None), getattr(uploaded, "size", None),
                         bool(enable_drum),
+                        bool(enable_bass),
                         round(float(melody_blend_gain), 3),
                         round(float(drum_blend_gain), 3),
+                        round(float(bass_blend_gain), 3),
                         round(float(st.session_state.get("drum_bpm", drum_bpm)), 3),
+                        round(float(st.session_state.get("bass_bpm", bass_bpm)), 3),
                         bool(loop_drums),
+                        bool(loop_bass),
                         round(float(prompt_seconds), 3),
                     )
                     if st.session_state.get("combined_key") != combined_key_now or "combined_bytes" not in st.session_state:
