@@ -54,7 +54,9 @@ def parse_midi_bass_events(midi_bytes: bytes) -> Tuple[List[Tuple[float, float, 
     best_track_events = []
     best_track_bends = []
     
-    pitch_bend_range_semitones = 2.0 # Standard GM pitch bend range
+    # Logic's EXS24 / Sampler typically uses a 12 semitone bend range for bass slides,
+    # but GM uses 2. We'll use 12 since large slides are common in Logic basslines.
+    pitch_bend_range_semitones = 12.0 
     
     for track in midi_file.tracks:
         current_time_s = 0.0
@@ -132,14 +134,31 @@ def bass_events_to_f0(
     t = np.arange(n_samples) / sr
     f0 = np.zeros(n_samples, dtype=float)
     
-    # Render base pitch
-    for s_time, e_time, midi_note, _ in events:
+    # Sort events by start time just in case
+    events = sorted(events, key=lambda x: x[0])
+    
+    # Render base pitch with legato portamento
+    for i, (s_time, e_time, midi_note, _) in enumerate(events):
         s0 = int(np.round(s_time * sr))
         s1 = int(np.round(e_time * sr))
         s0 = max(0, min(n_samples - 1, s0))
         s1 = max(0, min(n_samples, s1))
-        if s1 > s0:
-            f0[s0:s1] = midi_note
+        
+        if s1 <= s0:
+            continue
+            
+        f0[s0:s1] = midi_note
+        
+        # Check for overlaps (legato) to create a slide
+        if i > 0:
+            _, prev_e_time, prev_midi, _ = events[i-1]
+            # If previous note overlaps into this one, or ends exactly as this starts
+            if s_time < prev_e_time + 0.01:
+                glide_s = min(0.08, (e_time - s_time) * 0.5) # 80ms glide, or max half the note
+                g_samples = int(np.round(glide_s * sr))
+                if g_samples > 0 and s0 + g_samples < n_samples:
+                    # Overwrite the start of this note with a slide from the previous note
+                    f0[s0:s0+g_samples] = np.linspace(prev_midi, midi_note, g_samples)
             
     # Apply pitch bend
     if bends and np.any(f0 > 0):
