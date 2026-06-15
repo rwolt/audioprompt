@@ -124,7 +124,13 @@ def imprint_melody_focus(
 
 def rhythmic_gate_from_events(events, sr: int, n_samples: int, shape: str = "natural", decay_mult: float = 1.0):
     env = np.zeros(n_samples, dtype=float)
-    for (t0, t1, midi) in events:
+    for event in events:
+        if len(event) == 3:
+            t0, t1, midi = event
+            vel = 1.0
+        else:
+            t0, t1, midi, vel = event
+            
         if midi is None:
             continue
         s0 = int(np.round(t0 * sr))
@@ -168,7 +174,7 @@ def rhythmic_gate_from_events(events, sr: int, n_samples: int, shape: str = "nat
             if r_samples > 0:
                 seg[-r_samples:] *= np.linspace(1, 0, r_samples)
 
-        env[s0:s1] = np.maximum(env[s0:s1], seg)
+        env[s0:s1] = np.maximum(env[s0:s1], seg * float(vel))
     return env
 
 

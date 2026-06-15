@@ -828,9 +828,7 @@ with left:
                 help="Base envelope shape before Decay offset and velocity are applied.",
             )
             
-        bcol3, bcol4, bcol5 = st.columns(3, gap="small")
-        with bcol3:
-            bass_level = st.slider("Bass level", 0.0, 2.0, 1.0, 0.05, help="Gain for the bass layer.")
+        bcol4, bcol5 = st.columns(2, gap="small")
         with bcol4:
             bass_decay_offset = st.slider("Decay offset", 0.1, 3.0, 1.0, 0.1, help="Scales the length of the bass note envelope decay.")
         with bcol5:
@@ -860,6 +858,10 @@ with left:
                 step=1,
                 key="bass_bpm_value",
                 disabled=match_melody_bpm_bass,
+                help=(
+                    "Target BPM used only when Match melody BPM is off. "
+                    "New uploads start at their detected MIDI BPM so you can quickly return to the original groove tempo."
+                ),
             )
             bass_bpm = int(st.session_state.get("bass_bpm_value", bass_bpm))
             
@@ -875,7 +877,7 @@ with left:
         )
     else:
         bass_character, bass_note_shape = "Fingerstyle", "natural"
-        bass_level, bass_decay_offset, bass_pb_range = 1.0, 1.0, 12
+        bass_decay_offset, bass_pb_range = 1.0, 12
         match_melody_bpm_bass, loop_bass = True, True
         bass_bpm = int(bpm)
 
@@ -933,30 +935,6 @@ with left:
         band = None
         imprint_gain, harmonics, bw_frac, floor_db, sharpness = 8.0, 10, 0.01, -18.0, 12
 
-    # Build Focus/imprint/low‑end configs for generation
-    focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
-    imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
-    # Defaults while advanced controls are hidden
-    hpf_taps = 2049  # Steep by default
-    lowend_cfg = dict(
-        tame_low_end=bool(tame_low_end),
-        hpf_cutoff_hz=25,
-        hpf_taps=int(hpf_taps),
-        mono_lows=True,
-        mono_cutoff_hz=120,
-    )
-
-    # Build Focus/imprint/low‑end configs for generation
-    focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
-    imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
-    hpf_taps = 2049  # Steep by default
-    lowend_cfg = dict(
-        tame_low_end=bool(tame_low_end),
-        hpf_cutoff_hz=25,
-        hpf_taps=int(hpf_taps),
-        mono_lows=True,
-        mono_cutoff_hz=120,
-    )
 
 with right:
     # Reserve a container at the top for Generate so it's visually above
