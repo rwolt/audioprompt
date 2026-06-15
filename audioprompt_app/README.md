@@ -1,7 +1,7 @@
 AudioPrompt (Streamlit)
 
 Overview
-- Two-column Streamlit app for generating "audio prompts" that steer models: pink noise optionally imprinted with a randomized scale-constrained melody, optional spectral focus (bass/guitar/vocal/custom Hz band), rhythmic gating, and now a **Drum MIDI Imprint** layer.
+- Two-column Streamlit app for generating "audio prompts" that steer models: pink noise optionally imprinted with a randomized scale-constrained melody, optional spectral focus (bass/guitar/vocal/custom Hz band), rhythmic gating, a **Drum MIDI Imprint** layer, and a **Bass MIDI Imprint** layer with pitch bend and velocity support.
 - Drag-and-drop input (optional). The app always generates a prompt; it prepends the prompt to your input if a file is provided.
 - Big "Generate Prompt" button updates the audio when pressed; settings are adjustable between runs.
 - Downloads: prompt-only and combined (prepended) WAVs with tagged filenames.
@@ -34,12 +34,14 @@ Left column (Controls)
   - Root, Scale: Choose any from the built-in list (includes minor_blues, pentatonic, modes, etc.).
   - BPM: Tempo used for randomized event durations. If you also uploaded a Drum MIDI, match this BPM to the drum track.
   - Melody character: Simple harmonic-color presets for the imprinted melody. Voice/reed/bell/pluck/bright/wide change the tone without exposing low-level mask settings.
-  - Note shape: Sets the rhythmic envelope feel for imprinted notes. Tight and pluck are shorter; smooth is softer and more legato.
+  - Note shape: Sets the rhythmic envelope feel for imprinted notes. Tight and pluck have exponential decays; smooth has a softer attack.
+  - Note decay: Scales the envelope decay length — lower values give staccato notes, higher values let notes ring longer.
   - Range (Low/High MIDI): Register for the melody notes.
-  - Step bias / Max leap: Controls stepwise motion vs. larger interval jumps.
+  - Step bias / Max leap: Controls stepwise motion vs. larger interval jumps. Leaps are weighted toward characteristic scale intervals and the root for more musical results.
   - Rest prob: Fraction of time devoted to rests.
   - Glide prob/frac: Probability and portion of each note gliding toward the next.
   - Vibrato Hz/Depth: Subtle expressive pitch modulation.
+  - Root drone level (Advanced): Adds a sustained sine+triangle drone two octaves below the root underneath the melody. Useful for grounding the harmonic content.
 - Drum MIDI Imprint (when enabled)
   - Drum MIDI (.mid / .midi): Upload a General MIDI drum track exported from your DAW or drum sequencer.
   - Per-lane gains: Kick, Snare, Hat, Perc amounts. These are broad noise lanes, not separate sample instruments.
@@ -50,6 +52,16 @@ Left column (Controls)
   - Use detected BPM: Resets the independent drum BPM to the tempo found in the uploaded MIDI.
   - Independent drum BPM: Independent target tempo for the uploaded MIDI when Match melody BPM is off. New uploads start at their detected MIDI BPM, so unchecking Match melody BPM returns to the original groove tempo.
   - Loop drums to prompt length: Repeats the uploaded MIDI when the prompt is longer than the MIDI region. Turn it off to let drums stop after the uploaded MIDI ends.
+- Bass MIDI Imprint (when enabled)
+  - Bass MIDI (.mid / .midi): Upload a MIDI bass track exported from your DAW. Pitch bend and note velocity are preserved.
+  - Bass character: Upright, Fingerstyle, Picked, Synth, or Sub. Changes harmonic balance and frequency band to emulate different bass tones.
+  - Note shape base: Base envelope shape (natural/tight/pluck/smooth) before decay offset and velocity are applied.
+  - Decay offset: Scales the bass note envelope decay length.
+  - Pitch bend range: Must match the pitch wheel range set in the virtual instrument that generated the MIDI (Logic slides often use 12, 24, or 48 semitones).
+  - Match melody BPM (Bass): Use the melody BPM for the bass layer tempo.
+  - Use detected BPM: Resets the independent bass BPM to the tempo found in the uploaded MIDI.
+  - Independent bass BPM: Independent target tempo when Match melody BPM is off.
+  - Loop bass to prompt length: Repeats the uploaded MIDI when the prompt is longer than the bass region.
 - Focus (when enabled)
   - Preset: vocal (approximately 120-3200 Hz), guitar (approximately 80-6000 Hz), bass (approximately 40-300 Hz), or custom.
   - Custom band: Twin-handle Hz slider for low/high cutoff.
@@ -67,6 +79,7 @@ Right column (Output & Seed, Layer Blend, Generate, Outputs)
 - Layer Blend
   - Melody level: Gain for the melody / focus / pink-noise layer.
   - Drum level: Gain for the drum MIDI layer.
+  - Bass blend: Gain for the bass MIDI layer.
 - Generate & Outputs
   - Generate Prompt button
   - Prompt: In-page audio player and "Download prompt" button.
@@ -114,10 +127,12 @@ How it works (core pieces)
 - Pink noise: 1/sqrt(f) spectrum generated in the frequency domain.
 - Melody imprint: STFT magnitude shaped by time-varying harmonic masks built from an f0 trajectory.
 - Melody character: musician-facing presets alter harmonic weights, note envelope shape, and optional doubled-mask spread.
-- Randomized melody: scale-constrained note events with step/leap/rest behavior and optional glides.
+- Randomized melody: scale-constrained note events with weighted random walk — leaps prefer the root and characteristic scale intervals, and an opening motif introduces the scale's defining intervals at the start.
+- Root drone: a sine+triangle wave two octaves below the root, mixed under the melody at a user-controlled level.
 - Focus band: global EQ mask in log-frequency with soft edges and outside-band floor.
-- Gate: time-domain envelope matched to note onsets/offsets.
+- Gate: time-domain velocity-sensitive envelope matched to note onsets/offsets.
 - Drum MIDI Imprint: parses MIDI note events, maps them to lanes, generates band-limited pink noise per lane, applies velocity-sensitive AD envelopes, then applies compact tone/tune/decay presets.
+- Bass MIDI Imprint: parses bass MIDI note events with pitch bend, generates a continuous f0 trajectory (including legato slides and bend curves), imprints it onto pink noise using the same STFT mask engine as melody, and applies a velocity-sensitive rhythmic gate.
 
 Troubleshooting
 - "Failed to read input audio": Convert to WAV/FLAC/OGG; ensure the app has file read permission.
