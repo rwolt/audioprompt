@@ -42,6 +42,10 @@ Left column (Controls)
   - Glide prob/frac: Probability and portion of each note gliding toward the next.
   - Vibrato Hz/Depth: Subtle expressive pitch modulation.
   - Root drone level (Advanced): Adds a sustained sine+triangle drone two octaves below the root underneath the melody. Useful for grounding the harmonic content.
+  - Vowel character (expander, when melody enabled)
+    - Imprint vowels: Toggle off (default) for vowel-neutral buzz that lets the AI invent sounds freely. Toggle on to push toward English-style sung diction.
+    - Vowel strength: How hard the vowels are imprinted (0–1). Start around 0.6; above ~0.9 can sound robotic.
+    - Stress pattern: Accented notes (every 2nd/3rd/4th) get a full vowel; weak beats reduce to schwa. 2 = strong-weak (most English-like), 3 = more lilting.
 - Drum MIDI Imprint (when enabled)
   - Drum MIDI (.mid / .midi): Upload a General MIDI drum track exported from your DAW or drum sequencer.
   - Per-lane gains: Kick, Snare, Hat, Perc amounts. These are broad noise lanes, not separate sample instruments.
@@ -133,6 +137,7 @@ How it works (core pieces)
 - Gate: time-domain velocity-sensitive envelope matched to note onsets/offsets.
 - Drum MIDI Imprint: parses MIDI note events, maps them to lanes, generates band-limited pink noise per lane, applies velocity-sensitive AD envelopes, then applies compact tone/tune/decay presets.
 - Bass MIDI Imprint: parses bass MIDI note events with pitch bend, generates a continuous f0 trajectory (including legato slides and bend curves), imprints it onto pink noise using the same STFT mask engine as melody, and applies a velocity-sensitive rhythmic gate.
+- Vowel character (optional): builds a vowel plan from melody events — accented notes (every 2nd/3rd, selectable) get a full English vowel, weak beats reduce to schwa. That long-strong-then-reduced alternation is the acoustic signature of stress-timed English. Resolves the plan into a per-STFT-frame F1/F2/F3 trajectory with short glides between targets, then multiplies a sum-of-Lorentzian-resonances envelope into the STFT magnitude (same compositional layer as the focus band). A strength control blends from no effect to full character. Disabled by default; when off, output is unchanged.
 
 Troubleshooting
 - "Failed to read input audio": Convert to WAV/FLAC/OGG; ensure the app has file read permission.
@@ -155,6 +160,8 @@ Code structure
   - prompt.py: pink noise, melody imprint with optional focus, rhythmic gate.
   - mididrums.py: MIDI drum track parsing and lane mapping.
   - drumnoise.py: per-lane band-limited pink noise synthesis with velocity envelopes.
+  - midibass.py: bass MIDI parsing with pitch bend, legato slide, and BPM scaling.
+  - formants.py: English vowel formant tables, vowel plan assignment, per-frame F1/F2/F3 trajectory, and STFT magnitude envelope application.
 
 License
 - MIT - see ../../LICENSE. This app is part of the AudioPrompt repository and is covered by the root license.

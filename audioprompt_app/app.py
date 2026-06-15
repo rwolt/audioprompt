@@ -38,6 +38,7 @@ from audioprompt_core.mididrums import (
     loop_lane_events,
     LANES,
 )
+from audioprompt_core.formants import english_vowel_plan
 from audioprompt_core.midibass import (
     inspect_bass_midi_timing,
     parse_midi_bass_events,
@@ -247,6 +248,9 @@ def _download_name(kind: str, base_stem: str | None, meta: dict) -> str:
     character = meta.get("character", "neutral")
     if character != "neutral":
         parts.append(f"ch-{_slug(character)}")
+    vowel = meta.get("vowel")
+    if vowel:
+        parts.append(f"vow-{vowel}")
     return "_".join(parts) + ".wav"
 st.markdown(
     """
@@ -401,6 +405,16 @@ def build_prompt(
             vibrato_depth=melody_params["vib_depth"],
             seed=seed,
         )
+        cp = character_params or {}
+        vowel_plan = (
+            english_vowel_plan(
+                events,
+                accent_period=int(cp.get("accent_period", 2)),
+                seed=seed,
+            )
+            if cp.get("enable_formants")
+            else None
+        )
         y_prompt = imprint_melody_focus(
             x_pink,
             sr,
@@ -412,9 +426,11 @@ def build_prompt(
             band_floor_db=imprint_params["floor_db"],
             sharpness=imprint_params["sharpness"],
             n_fft=int(imprint_params["n_fft"]),
-            character=(character_params or {}).get("character", "neutral"),
-            note_shape=(character_params or {}).get("note_shape", "natural"),
-            detune_spread_cents=float((character_params or {}).get("detune_spread_cents", 0.0)),
+            character=cp.get("character", "neutral"),
+            note_shape=cp.get("note_shape", "natural"),
+            detune_spread_cents=float(cp.get("detune_spread_cents", 0.0)),
+            vowel_plan=vowel_plan,
+            formant_strength=float(cp.get("formant_strength", 1.0)),
         )
     elif enable_focus:
         y_prompt = imprint_melody_focus(
@@ -604,6 +620,41 @@ with left:
                 glide_frac = st.slider("Glide frac", 0.0, 0.9, 0.35, 0.01, help="Portion of the note duration spent gliding.")
             rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.12, 0.01, help="Chance of rests vs notes.")
             drone_level = st.slider("Root drone level", 0.0, 1.0, 0.0, 0.05, help="Subtle sustained drone on the root note beneath the melody.")
+
+        with st.expander("Vowel character", expanded=False):
+            enable_formants = st.checkbox(
+                "Imprint vowels",
+                value=False,
+                help=(
+                    "Shape the melody imprint toward sung vowels. Off = a "
+                    "vowel-neutral buzz, which gives the AI more freedom and "
+                    "often hallucinates instruments better. On = pushes toward "
+                    "English-style sung diction. Turn on when you want clearer "
+                    "words, off for instrumental or open-ended results."
+                ),
+            )
+            vfcol1, vfcol2 = st.columns(2, gap="small")
+            with vfcol1:
+                formant_strength = st.slider(
+                    "Vowel strength", 0.0, 1.0, 0.6, 0.05,
+                    help=(
+                        "How hard the vowels are imprinted. Low = a hint the "
+                        "model can override; high = strong vowel character that "
+                        "can sound robotic if overdone. Start ~0.6 and tune by ear."
+                    ),
+                )
+            with vfcol2:
+                accent_period = st.selectbox(
+                    "Stress pattern",
+                    options=[2, 3, 4],
+                    index=0,
+                    help=(
+                        "Accented notes get full vowels; the rest reduce to a "
+                        "neutral 'schwa'. 2 = strong-weak (most English-like), "
+                        "3 = strong-weak-weak (more lilting). Vowel reduction is "
+                        "the acoustic signature of stress-timed English."
+                    ),
+                )
     else:
         # Provide defaults when melody disabled to keep variables defined
         melody_root = "E"
@@ -616,6 +667,9 @@ with left:
         vib_hz, vib_depth = 5.5, 0.02
         melody_character, note_shape = "neutral", "natural"
         note_decay = 1.0
+        enable_formants = False
+        formant_strength = 0.6
+        accent_period = 2
 
     # Add ~36px top margin before Drum header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -963,6 +1017,9 @@ with right:
         note_shape=note_shape,
         note_decay=float(note_decay),
         detune_spread_cents=7.0 if melody_character == "wide" else 0.0,
+        enable_formants=bool(enable_formants),
+        formant_strength=float(formant_strength),
+        accent_period=int(accent_period),
     )
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
     imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
@@ -1279,6 +1336,10 @@ with right:
                         band if focus_params.get("preset") is None else None,
                     ),
                     "character": melody_character,
+                    "vowel": (
+                        f"EN-s{int(round(formant_strength * 100))}-a{accent_period}"
+                        if enable_melody and enable_formants else None
+                    ),
                 }
 
         # Outputs header
@@ -1329,6 +1390,10 @@ with right:
                         band if focus_params.get("preset") is None else None,
                     ),
                     "character": melody_character,
+                    "vowel": (
+                        f"EN-s{int(round(formant_strength * 100))}-a{accent_period}"
+                        if enable_melody and enable_formants else None
+                    ),
                 },
             )
             prompt_only_name_local = _download_name("prompt", base_stem_local, download_meta)
