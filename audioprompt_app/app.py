@@ -941,10 +941,22 @@ with left:
             value=True,
             help="Repeats the bass MIDI when the prompt is longer than the MIDI region.",
         )
+        bass_trim_silence = st.checkbox(
+            "Trim silence before first note",
+            value=True,
+            help=(
+                "Removes empty lead-in before the first note "
+                "(e.g. Logic session-player exports add a phantom bar). "
+                "Preserves an intentional pickup or rest that's written on "
+                "the note itself. Turn off if your bass should start with "
+                "deliberate leading silence."
+            ),
+        )
     else:
         bass_character, bass_note_shape = "Fingerstyle", "natural"
         bass_decay_offset, bass_pb_range = 1.0, 12
         match_melody_bpm_bass, loop_bass = True, True
+        bass_trim_silence = True
         bass_bpm = int(bpm)
 
     # Add ~36px top margin before Focus header for clearer separation
@@ -1244,7 +1256,11 @@ with right:
                 if enable_bass and bass_midi_file is not None:
                     try:
                         bass_seed_used = seed_to_use + 2
-                        bass_events, bass_bends, detected_bass_bpm = parse_midi_bass_events(bass_midi_file.getvalue(), pitch_bend_range=float(bass_pb_range))
+                        bass_events, bass_bends, detected_bass_bpm = parse_midi_bass_events(
+                            bass_midi_file.getvalue(),
+                            pitch_bend_range=float(bass_pb_range),
+                            trim_leading_silence=bool(bass_trim_silence),
+                        )
                         target_bass_bpm = float(bpm) if match_melody_bpm_bass else float(bass_bpm)
                         bass_speed_mult = target_bass_bpm / max(float(detected_bass_bpm), 1e-6)
                         _log_debug(
