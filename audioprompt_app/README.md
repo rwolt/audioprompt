@@ -33,7 +33,7 @@ Left column (Controls)
 - Melody (when enabled)
   - Root, Scale: Choose any from the built-in list (includes minor_blues, pentatonic, modes, etc.).
   - BPM: Tempo used for randomized event durations. If you also uploaded a Drum MIDI, match this BPM to the drum track.
-  - Melody character: Simple harmonic-color presets for the imprinted melody. Voice/reed/bell/pluck/bright/wide change the tone without exposing low-level mask settings.
+  - Melody character: Harmonic color preset for the imprinted melody. Neutral: flat harmonic stack. Warm: rolls off high harmonics for a mellow tone. Voice: emphasizes low harmonics (1–5) for a vocal buzz. Reed: odd harmonics only (clarinet-like). Bell: peaks around the 3rd harmonic. Pluck: fast harmonic decay. Bright: boosts higher harmonics for more edge. Wide: neutral harmonics with a 7-cent detune spread for subtle thickness.
   - Note shape: Sets the rhythmic envelope feel for imprinted notes. Tight and pluck have exponential decays; smooth has a softer attack.
   - Note decay: Scales the envelope decay length — lower values give staccato notes, higher values let notes ring longer.
   - Range (Low/High MIDI): Register for the melody notes.
@@ -66,6 +66,7 @@ Left column (Controls)
   - Use detected BPM: Resets the independent bass BPM to the tempo found in the uploaded MIDI.
   - Independent bass BPM: Independent target tempo when Match melody BPM is off.
   - Loop bass to prompt length: Repeats the uploaded MIDI when the prompt is longer than the bass region.
+  - Trim silence before first note: Removes empty lead-in before the first note (e.g. Logic session-player exports add a phantom bar). Preserves any intentional pickup or rest written into the note's own timing. Turn off when your bass genuinely starts with leading silence.
 - Focus (when enabled)
   - Preset: vocal (approximately 120-3200 Hz), guitar (approximately 80-6000 Hz), bass (approximately 40-300 Hz), or custom.
   - Custom band: Twin-handle Hz slider for low/high cutoff.
@@ -73,7 +74,7 @@ Left column (Controls)
   - Harmonics: Number of harmonics in the emphasis mask.
   - BW frac: Fractional bandwidth of harmonic peaks (smaller = sharper pitch focus).
   - Band floor (dB): Attenuation outside the focused band.
-  - Band edge sharpness: Steepness of the band edges.
+  - Band edge sharpness: Sigmoid steepness controlling how sharply the spectrum rolls off outside the focus band. 6 = gentle slope; 12 = moderate; 24 ≈ near-brick-wall. Dimensionless — not dB/Hz.
 
 Right column (Output & Seed, Layer Blend, Generate, Outputs)
 - Output & Seed
@@ -94,7 +95,7 @@ Filename tagging
 - Output names use compact tags for the most important generation settings.
   - Prompt only: ap_prompt_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav
   - Combined: my-song-take-1_combined_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav
-  - Tags: r = root, s = scale, mb = melody BPM, ms = melody/noise seed, db = drum BPM, ds = drum seed. Focus appears only when enabled, e.g. f-voc or f-b120-3200. Character appears only when non-neutral, e.g. ch-voice.
+  - Tags: r = root, s = scale, mb = melody BPM, ms = melody/noise seed, db = drum BPM, ds = drum seed. Focus appears only when enabled, e.g. f-voc or f-b120-3200. Character appears only when non-neutral, e.g. ch-voice. Vowel character appears when enabled, e.g. vow-EN-s60-a2 (strength 60%, accent period 2).
 
 MIDI Drum Map (General MIDI -> lanes)
 - AudioPrompt follows General MIDI drum note numbers. Use the MIDI number as the source of truth: octave labels vary by DAW, so MIDI 36 may appear as C1, C2, or another octave label depending on the piano-roll setting.
@@ -105,8 +106,8 @@ MIDI Drum Map (General MIDI -> lanes)
 | 41, 43, 45, 47, 48, 50 | Toms; labels vary by octave setting | snare | Tom notes currently share the snare/body lane |
 | 42, 44, 46 | Often F#1/G#1/A#1 or F#2/G#2/A#2 | hat | Closed, Pedal, Open Hi-Hat |
 | 49, 51, 52, 55, 57, 59 | Cymbals; labels vary by octave setting | hat | Crash/Ride/Splash cymbals share the hat lane |
-| 54, 56, 58, 62-85 | varies | perc | Tambourine, Cowbell, Congas, Bongos, Claves, etc. |
-- Any note not in the table goes to the perc lane so unexpected drum hits still make sound.
+| 54, 56, 58, 62-85, and all other unlisted notes | varies | perc | Tambourine, Cowbell, Congas, Bongos, Claves, etc. — and any note not mapped above |
+- Every MIDI note not matched by the kick/snare/hat rows is routed to the perc lane. This includes non-GM notes and any unexpected hits from your DAW.
 - The parser reads all tracks because some DAWs export drums across multiple tracks.
 - For the quickest setup from Logic Session Drummer, export/convert the drummer region to MIDI and leave the notes on their General MIDI drum pitches. Start with kick/snare/hat, then use Perc amount if your groove includes auxiliary percussion.
 
@@ -151,6 +152,7 @@ Deploying publicly (Streamlit Community Cloud)
 1) Push this folder to GitHub.
 2) Create a new Streamlit app, point to app.py, and select the repo.
 3) It installs requirements.txt and runs automatically; no secrets are needed.
+- Note: Streamlit Community Cloud may collect anonymized platform analytics (e.g. visitor counts). This app does not store uploaded audio or any user data.
 
 Code structure
 - app.py: Streamlit UI and orchestration.

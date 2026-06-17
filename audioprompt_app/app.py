@@ -485,9 +485,9 @@ with top_left:
     st.subheader("Quick Start")
     st.markdown(
         """
-        AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It can imprint a scale‑based melody, emphasize a frequency band (vocal/guitar/bass/custom), and prepend the prompt to your input audio.
+        AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It imprints a scale‑based melody, emphasizes a frequency band, and can prepend the prompt to your input audio.
 
-        1. Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only (a simple 1–2 bar drum loop works great as a starting point).
+        1. (Optional) Drag‑drop input audio — the prompt will be **prepended** to it to create a combined WAV. Leave empty for a prompt-only WAV. A 1–2 bar drum loop works great as a starting point.
         2. Set Prompt seconds and choose Melody settings (root/scale/BPM).
         3. Use Focus (or Custom band) and enable Bass Roll-Off for cleaner prompt starts.
         4. Click Generate Prompt. Preview the Prompt, and if input audio is provided, the Combined result. Download the tagged WAVs.
@@ -576,7 +576,7 @@ with left:
 
         col1, col2 = st.columns(2, gap="small")
         with col1:
-            bpm = st.slider("BPM", 40, 220, 96, 1, help="Tempo driving randomized note durations.")
+            bpm = st.slider("BPM", 20, 220, 96, 1, help="Tempo driving randomized note durations. Go as low as 20 for halftime vocals over 40 BPM drum tracks.")
         with col2:
             vib_hz = st.slider("Vibrato Hz", 3.0, 9.0, 5.5, 0.1, help="Rate of pitch modulation.")
         vib_depth = st.slider("Vibrato depth", 0.0, 0.05, 0.02, 0.001, help="Depth of pitch modulation (fraction).")
@@ -587,9 +587,11 @@ with left:
                 options=["neutral", "warm", "voice", "reed", "bell", "pluck", "bright", "wide"],
                 index=0,
                 help=(
-                    "Changes the harmonic balance of the melody imprint. "
-                    "Use voice/reed/bell/pluck for instrument-like colors, bright for more edge, "
-                    "or wide for a subtle doubled-mask thickness."
+                    "Harmonic color of the melody imprint. "
+                    "Neutral: flat harmonic stack. Warm: rolls off high harmonics for a mellow tone. "
+                    "Voice: emphasizes low harmonics (1–5) for a vocal buzz. Reed: odd harmonics only (clarinet-like). "
+                    "Bell: peaks around the 3rd harmonic for a metallic shimmer. Pluck: fast harmonic decay. "
+                    "Bright: boosts higher harmonics for more edge. Wide: neutral harmonics + 7-cent detune spread for subtle thickness."
                 ),
             )
         with ccol2:
@@ -780,8 +782,10 @@ with left:
                 options=["clean", "tight", "deep", "bright", "breakbeat"],
                 index=0,
                 help=(
-                    "Applies a small set of lane tone/envelope presets. "
-                    "Breakbeat adds body, snap, and light saturation while keeping the MIDI groove."
+                    "Tonal preset for the drum layer. "
+                    "Clean: balanced default. Tight: shorter envelopes and snappier transients. "
+                    "Deep: bass-heavy low end with extra kick weight. Bright: more hat and upper-mid presence. "
+                    "Breakbeat: pumped body, snappy snare, and light drive — groove timing stays intact."
                 ),
             )
             snare_tune = st.slider(
@@ -818,7 +822,7 @@ with left:
         with tempo2:
             drum_bpm = st.slider(
                 "Independent drum BPM",
-                40,
+                20,
                 220,
                 value=int(st.session_state.get("drum_bpm_value", bpm)),
                 step=1,
@@ -884,7 +888,14 @@ with left:
                 "Bass character",
                 options=["Upright", "Fingerstyle", "Picked", "Synth", "Sub"],
                 index=1,
-                help="Changes the harmonic balance and frequency band to emulate different bass tones.",
+                help=(
+                    "Tonal preset for the bass imprint. "
+                    "Upright: warm, pluck-like decay in the low-mid range (40–800 Hz). "
+                    "Fingerstyle: balanced midrange tone (40–2000 Hz). "
+                    "Picked: bright with lots of harmonics and strong attack transient (40–5000 Hz). "
+                    "Sub: deep, smooth, low-frequency-only (30–200 Hz). "
+                    "Synth: odd-harmonic reed-like character with smooth envelope (30–3000 Hz)."
+                ),
             )
         with bcol2:
             bass_note_shape = st.selectbox(
@@ -918,7 +929,7 @@ with left:
         with btempo2:
             bass_bpm = st.slider(
                 "Independent bass BPM",
-                40,
+                20,
                 220,
                 value=int(st.session_state.get("bass_bpm_value", bpm)),
                 step=1,
@@ -1007,7 +1018,7 @@ with left:
             with colf4:
                 floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
             with colf5:
-                sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Steepness of the band edges.")
+                sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Sigmoid steepness of the band rolloff. 6 = gentle slope; 12 = moderate; 24 ≈ near-brick-wall. Dimensionless — not dB/Hz.")
             # Low‑end advanced controls hidden for now; using sensible defaults
     else:
         band = None
@@ -1571,7 +1582,7 @@ with right:
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
 st.markdown(
-    "<div class='footer-note'>Terms & Privacy: Upload only content you have rights to. By using this app you confirm you have permission to process any uploaded audio.</div>",
+    "<div class='footer-note'>Terms: Upload only content you own or have rights to. By using this app you confirm permission to process any uploaded audio.</div>",
     unsafe_allow_html=True,
 )
 
