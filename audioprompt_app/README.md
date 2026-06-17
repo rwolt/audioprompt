@@ -72,7 +72,7 @@ Left column (Controls)
   - Custom band: Twin-handle Hz slider for low/high cutoff.
   - Imprint gain: Strength of harmonic emphasis around the melody's partials.
   - Harmonics: Number of harmonics in the emphasis mask.
-  - BW frac: Fractional bandwidth of harmonic peaks (smaller = sharper pitch focus).
+  - BW frac: Primary texture control. Narrow (0.005–0.01) = tight pitch instruction; wider (0.02–0.05) feels less robotic; 0.05–0.1 gives a diffuse, atmospheric texture.
   - Band floor (dB): Attenuation outside the focused band.
   - Band edge sharpness: Sigmoid steepness controlling how sharply the spectrum rolls off outside the focus band. 6 = gentle slope; 12 = moderate; 24 ≈ near-brick-wall. Dimensionless — not dB/Hz.
 

@@ -631,8 +631,23 @@ with left:
                                       key="high_midi_val")
                 leap_steps = st.slider("Max leap (scale steps)", 1, 8, 7, 1, help="Largest jump when not stepping.")
                 glide_frac = st.slider("Glide frac", 0.0, 0.9, 0.35, 0.01, help="Portion of the note duration spent gliding.")
-            rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.10, 0.01, help="Chance of rests vs notes.")
-            drone_level = st.slider("Root drone level", 0.0, 1.0, 0.0, 0.05, help="Subtle sustained drone on the root note beneath the melody.")
+            rdcol1, rdcol2 = st.columns(2, gap="small")
+            with rdcol1:
+                rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.10, 0.01, help="Chance of rests vs notes.")
+            with rdcol2:
+                drone_level = st.slider("Root drone level", 0.0, 1.0, 0.0, 0.05, help="Subtle sustained drone on the root note beneath the melody.")
+            icol1, icol2 = st.columns(2, gap="small")
+            with icol1:
+                imprint_gain = st.slider("Imprint gain", 0.0, 16.0, 8.0, 0.5,
+                    help="Strength of harmonic emphasis on the pink noise.")
+            with icol2:
+                harmonics = st.slider("Harmonics", 0, 16, 10, 1,
+                    help="Number of harmonic peaks in the pitch mask.")
+            bw_frac = st.slider("BW frac", 0.002, 0.1, 0.01, 0.001,
+                help="Primary texture control. Narrow (0.005–0.01): tight pitch instruction, "
+                     "can sound synthetic. Widen (0.02–0.05) to make the melody feel less "
+                     "robotic without losing the harmonic steer. Go higher (0.05–0.1) for a "
+                     "very diffuse, atmospheric texture.")
 
         with st.expander("Vowel character", expanded=False):
             enable_formants = st.checkbox(
@@ -684,6 +699,7 @@ with left:
         enable_formants = False
         formant_strength = 0.6
         accent_period = 2
+        imprint_gain, harmonics, bw_frac = 8.0, 10, 0.01
 
     # Add ~36px top margin before Drum header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -963,12 +979,22 @@ with left:
                 "deliberate leading silence."
             ),
         )
+        with st.expander("Bass – Advanced", expanded=False):
+            bacol1, bacol2 = st.columns(2, gap="small")
+            with bacol1:
+                bass_imprint_gain = st.slider("Bass imprint gain", 0.0, 16.0, 8.0, 0.5,
+                    help="Strength of harmonic emphasis on the bass pitch mask.")
+            with bacol2:
+                bass_bw_frac = st.slider("Bass BW frac", 0.002, 0.05, 0.01, 0.001,
+                    help="Relative bandwidth around each harmonic. Wider = looser, "
+                         "less synthetic-sounding pitch lock.")
     else:
         bass_character, bass_note_shape = "Fingerstyle", "natural"
         bass_decay_offset, bass_pb_range = 1.0, 12
         match_melody_bpm_bass, loop_bass = True, True
         bass_trim_silence = True
         bass_bpm = int(bpm)
+        bass_imprint_gain, bass_bw_frac = 8.0, 0.01
 
     # Add ~36px top margin before Focus header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -1007,22 +1033,14 @@ with left:
                 band = st.slider("Focus Hz band", 20, 20000, (120, 3200), step=10, help="Twin‑handle slider: low/high cutoff in Hz.")
             else:
                 band = None
-            colf1, colf2, colf3 = st.columns(3)
-            with colf1:
-                imprint_gain = st.slider("Imprint gain", 0.0, 16.0, 8.0, 0.5, help="Strength of harmonic emphasis.")
-            with colf2:
-                harmonics = st.slider("Harmonics", 0, 16, 10, 1, help="Number of harmonic peaks.")
-            with colf3:
-                bw_frac = st.slider("BW frac", 0.002, 0.05, 0.01, 0.001, help="Relative bandwidth around each harmonic.")
             colf4, colf5 = st.columns(2)
             with colf4:
                 floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
             with colf5:
                 sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Sigmoid steepness of the band rolloff. 6 = gentle slope; 12 = moderate; 24 ≈ near-brick-wall. Dimensionless — not dB/Hz.")
-            # Low‑end advanced controls hidden for now; using sensible defaults
     else:
         band = None
-        imprint_gain, harmonics, bw_frac, floor_db, sharpness = 8.0, 10, 0.01, -18.0, 12
+        floor_db, sharpness = -18.0, 12
 
 
 with right:
@@ -1057,7 +1075,8 @@ with right:
         accent_period=int(accent_period),
     )
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
-    imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
+    imprint_params = dict(gain=imprint_gain, harmonics=harmonics, bw_frac=bw_frac,
+                          floor_db=floor_db, sharpness=sharpness, n_fft=2048)
     # Low-end config dict for core processing
     hpf_taps = 2049  # Steep by default
     lowend_cfg = dict(
@@ -1290,7 +1309,7 @@ with right:
                         
                         # Apply timbre based on preset
                         bass_char_params = {"character": "neutral", "note_shape": bass_note_shape, "note_decay": float(bass_decay_offset)}
-                        bass_imprint_params = {"gain": 8.0, "harmonics": 10, "bw_frac": 0.01, "floor_db": -24.0, "sharpness": 12, "n_fft": 2048}
+                        bass_imprint_params = {"gain": bass_imprint_gain, "harmonics": 10, "bw_frac": bass_bw_frac, "floor_db": -24.0, "sharpness": 12, "n_fft": 2048}
                         bass_focus = (40, 800)
                         
                         if bass_character == "Upright":
