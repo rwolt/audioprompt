@@ -887,7 +887,7 @@ with left:
             bass_character = st.selectbox(
                 "Bass character",
                 options=["Upright", "Fingerstyle", "Picked", "Synth", "Sub"],
-                index=1,
+                index=0,
                 help=(
                     "Tonal preset for the bass imprint. "
                     "Upright: warm, pluck-like decay in the low-mid range (40–800 Hz). "
@@ -964,7 +964,7 @@ with left:
             ),
         )
     else:
-        bass_character, bass_note_shape = "Fingerstyle", "natural"
+        bass_character, bass_note_shape = "Upright", "natural"
         bass_decay_offset, bass_pb_range = 1.0, 12
         match_melody_bpm_bass, loop_bass = True, True
         bass_trim_silence = True
