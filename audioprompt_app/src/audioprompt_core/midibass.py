@@ -26,64 +26,100 @@ def inspect_bass_midi_timing(midi_bytes: bytes) -> dict:
     return {"bpm": bpm, "length_s": length_s}
 
 
-def parse_midi_bass_events(midi_bytes: bytes, pitch_bend_range: float = 12.0) -> Tuple[List[Tuple[float, float, int, float]], List[Tuple[float, float]], float]:
+def parse_midi_bass_events(midi_bytes: bytes, pitch_bend_range: float = 12.0, trim_leading_silence: bool = True) -> Tuple[List[Tuple[float, float, int, float]], List[Tuple[float, float]], float]:
     """
     Parses a MIDI file to extract bass note events and pitch bend.
-    Returns:
-        events: List of (start_s, end_s, midi_note, velocity_norm)
-        pitch_bends: List of (time_s, bend_semitones)
-        bpm: detected BPM
+
+    Parameters
+    ----------
+    trim_leading_silence:
+        When True (default), subtract the time consumed by non-note events
+        (controllers, meta messages) that precede the first note_on.  This
+        removes the phantom bar some DAWs prepend while preserving any
+        intentional pickup, because a pickup's offset lives on the note's
+        own delta — not in prior non-note deltas.  Set False to return raw
+        absolute timing unchanged.
+
+    Returns
+    -------
+    events: List of (start_s, end_s, midi_note, velocity_norm)
+    pitch_bends: List of (time_s, bend_semitones)
+    bpm: detected BPM
     """
     midi_file = mido.MidiFile(file=BytesIO(midi_bytes))
     tempo = 500000
     ticks_per_beat = midi_file.ticks_per_beat
-    
+
     # First pass: find tempo
     for track in midi_file.tracks:
         for msg in track:
             if msg.type == 'set_tempo':
                 tempo = msg.tempo
                 break
-                
+
     bpm = mido.tempo2bpm(tempo)
-    
-    events = []
-    pitch_bends = []
-    
+
     # We'll assume the longest track with notes is the bass track
-    best_track_events = []
-    best_track_bends = []
-    
-    pitch_bend_range_semitones = float(pitch_bend_range) 
-    
+    best_track_events: List[Tuple[float, float, int, float]] = []
+    best_track_bends: List[Tuple[float, float]] = []
+
+    pitch_bend_range_semitones = float(pitch_bend_range)
+
     for track in midi_file.tracks:
         current_time_s = 0.0
-        active_notes = {} # note -> (start_time, velocity)
-        track_events = []
-        track_bends = []
-        
+        active_notes: dict[int, tuple[float, float]] = {}  # note -> (start_time, velocity)
+        track_events: List[Tuple[float, float, int, float]] = []
+        track_bends: List[Tuple[float, float]] = []
+        lead_time: float | None = None  # time consumed by non-note events before first note_on
+
         for msg in track:
             dt_s = mido.tick2second(msg.time, ticks_per_beat, tempo)
             current_time_s += dt_s
-            
+
             if msg.type == 'note_on' and msg.velocity > 0:
+                # Bug 2: capture time of non-note preamble at moment of first note_on,
+                # BEFORE this note's own delta, so intentional pickups are preserved.
+                if lead_time is None:
+                    lead_time = current_time_s - dt_s
+
+                # Bug 1: same pitch retriggered while still held — close the held note
+                # first so it gets its real duration instead of being overwritten.
+                if msg.note in active_notes:
+                    start_t, vel = active_notes.pop(msg.note)
+                    if current_time_s > start_t:
+                        track_events.append((start_t, current_time_s, msg.note, vel))
+
                 active_notes[msg.note] = (current_time_s, msg.velocity / 127.0)
+
             elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
                 if msg.note in active_notes:
                     start_t, vel = active_notes.pop(msg.note)
-                    track_events.append((start_t, current_time_s, msg.note, vel))
+                    if current_time_s > start_t:
+                        track_events.append((start_t, current_time_s, msg.note, vel))
+
             elif msg.type == 'pitchwheel':
-                # msg.pitch is -8192 to 8191
                 bend_st = (msg.pitch / 8192.0) * pitch_bend_range_semitones
                 track_bends.append((current_time_s, bend_st))
-                
+
+        # Bug 1: close any notes still held at end of track (no note_off received).
+        for note, (start_t, vel) in active_notes.items():
+            if current_time_s > start_t:
+                track_events.append((start_t, current_time_s, note, vel))
+
+        # Bug 2: strip phantom non-note lead time (only when requested).
+        # A lead_time of 0 (clean MIDI or genuine pickup) leaves everything unchanged.
+        if lead_time is None:
+            lead_time = 0.0
+        if trim_leading_silence and lead_time > 0.0:
+            track_events = [(s - lead_time, e - lead_time, m, v)
+                            for s, e, m, v in track_events]
+            track_bends = [(max(0.0, t - lead_time), b) for t, b in track_bends]
+
         if len(track_events) > len(best_track_events):
             best_track_events = track_events
             best_track_bends = track_bends
-            
-    # Sort events by start time
+
     best_track_events.sort(key=lambda x: x[0])
-    
     return best_track_events, best_track_bends, bpm
 
 def scale_bass_events(

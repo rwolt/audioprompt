@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 from scipy.signal import stft, istft, firwin, filtfilt
 
+from audioprompt_core.formants import vowel_traj_from_plan, apply_formants
+
 
 def pink_noise(n: int, sr: int, seed: int | None = None) -> np.ndarray:
     rng = np.random.default_rng(seed)
@@ -66,6 +68,8 @@ def imprint_melody_focus(
     character: str = "neutral",
     note_shape: str = "natural",
     detune_spread_cents: float = 0.0,
+    vowel_plan=None,
+    formant_strength: float = 1.0,
 ) -> np.ndarray:
     hop = n_fft // 4
     # Use Hann window with default boundary handling to satisfy NOLA/overlap-add conditions
@@ -114,6 +118,10 @@ def imprint_melody_focus(
         if mask.max() > 0:
             mask = 1.0 + (gain * (mask / mask.max()))
             mag[:, i] *= mask
+
+    if vowel_plan is not None:
+        vtraj = vowel_traj_from_plan(vowel_plan, times)
+        apply_formants(mag, freqs, times, vtraj, strength=float(formant_strength))
 
     # Inverse STFT with matching window and hop
     _, y = istft(mag * np.exp(1j * ph), fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)

@@ -28,6 +28,7 @@ from audioprompt_core.prompt import (
 )
 from audioprompt_core.melody import (
     SCALES,
+    NOTE_TO_MIDI,
     generate_random_melody,
     events_to_f0,
 )
@@ -38,6 +39,7 @@ from audioprompt_core.mididrums import (
     loop_lane_events,
     LANES,
 )
+from audioprompt_core.formants import english_vowel_plan
 from audioprompt_core.midibass import (
     inspect_bass_midi_timing,
     parse_midi_bass_events,
@@ -247,6 +249,9 @@ def _download_name(kind: str, base_stem: str | None, meta: dict) -> str:
     character = meta.get("character", "neutral")
     if character != "neutral":
         parts.append(f"ch-{_slug(character)}")
+    vowel = meta.get("vowel")
+    if vowel:
+        parts.append(f"vow-{vowel}")
     return "_".join(parts) + ".wav"
 st.markdown(
     """
@@ -401,6 +406,16 @@ def build_prompt(
             vibrato_depth=melody_params["vib_depth"],
             seed=seed,
         )
+        cp = character_params or {}
+        vowel_plan = (
+            english_vowel_plan(
+                events,
+                accent_period=int(cp.get("accent_period", 2)),
+                seed=seed,
+            )
+            if cp.get("enable_formants")
+            else None
+        )
         y_prompt = imprint_melody_focus(
             x_pink,
             sr,
@@ -412,9 +427,11 @@ def build_prompt(
             band_floor_db=imprint_params["floor_db"],
             sharpness=imprint_params["sharpness"],
             n_fft=int(imprint_params["n_fft"]),
-            character=(character_params or {}).get("character", "neutral"),
-            note_shape=(character_params or {}).get("note_shape", "natural"),
-            detune_spread_cents=float((character_params or {}).get("detune_spread_cents", 0.0)),
+            character=cp.get("character", "neutral"),
+            note_shape=cp.get("note_shape", "natural"),
+            detune_spread_cents=float(cp.get("detune_spread_cents", 0.0)),
+            vowel_plan=vowel_plan,
+            formant_strength=float(cp.get("formant_strength", 1.0)),
         )
     elif enable_focus:
         y_prompt = imprint_melody_focus(
@@ -439,7 +456,7 @@ def build_prompt(
         y_prompt = (y_prompt * (0.15 + 0.85 * gate)).astype(np.float32)
 
     if enable_melody and melody_params.get("drone_level", 0.0) > 0.0:
-        from audioprompt_core.melody import NOTE_TO_MIDI, midi_to_hz
+        from audioprompt_core.melody import midi_to_hz
         root_midi = NOTE_TO_MIDI.get(melody_params["root"], 60)
         drone_hz = midi_to_hz(root_midi - 24) # Two octaves down for bass drone
         t_arr = np.arange(n) / sr
@@ -468,9 +485,9 @@ with top_left:
     st.subheader("Quick Start")
     st.markdown(
         """
-        AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It can imprint a scale‑based melody, emphasize a frequency band (vocal/guitar/bass/custom), and prepend the prompt to your input audio.
+        AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It imprints a scale‑based melody, emphasizes a frequency band, and can prepend the prompt to your input audio.
 
-        1. Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only (a simple 1–2 bar drum loop works great as a starting point).
+        1. (Optional) Drag‑drop input audio — the prompt will be **prepended** to it to create a combined WAV. Leave empty for a prompt-only WAV. A 1–2 bar drum loop works great as a starting point.
         2. Set Prompt seconds and choose Melody settings (root/scale/BPM).
         3. Use Focus (or Custom band) and enable Bass Roll-Off for cleaner prompt starts.
         4. Click Generate Prompt. Preview the Prompt, and if input audio is provided, the Combined result. Download the tagged WAVs.
@@ -559,7 +576,7 @@ with left:
 
         col1, col2 = st.columns(2, gap="small")
         with col1:
-            bpm = st.slider("BPM", 40, 220, 96, 1, help="Tempo driving randomized note durations.")
+            bpm = st.slider("BPM", 20, 220, 96, 1, help="Tempo driving randomized note durations. Go as low as 20 for halftime vocals over 40 BPM drum tracks.")
         with col2:
             vib_hz = st.slider("Vibrato Hz", 3.0, 9.0, 5.5, 0.1, help="Rate of pitch modulation.")
         vib_depth = st.slider("Vibrato depth", 0.0, 0.05, 0.02, 0.001, help="Depth of pitch modulation (fraction).")
@@ -570,9 +587,11 @@ with left:
                 options=["neutral", "warm", "voice", "reed", "bell", "pluck", "bright", "wide"],
                 index=0,
                 help=(
-                    "Changes the harmonic balance of the melody imprint. "
-                    "Use voice/reed/bell/pluck for instrument-like colors, bright for more edge, "
-                    "or wide for a subtle doubled-mask thickness."
+                    "Harmonic color of the melody imprint. "
+                    "Neutral: flat harmonic stack. Warm: rolls off high harmonics for a mellow tone. "
+                    "Voice: emphasizes low harmonics (1–5) for a vocal buzz. Reed: odd harmonics only (clarinet-like). "
+                    "Bell: peaks around the 3rd harmonic for a metallic shimmer. Pluck: fast harmonic decay. "
+                    "Bright: boosts higher harmonics for more edge. Wide: neutral harmonics + 7-cent detune spread for subtle thickness."
                 ),
             )
         with ccol2:
@@ -593,29 +612,78 @@ with left:
             )
 
         with st.expander("Melody – Advanced", expanded=False):
+            # Auto-set Low/High MIDI to root note (octave 3) + 1.5 octaves when root changes.
+            _root_midi_base = NOTE_TO_MIDI.get(melody_root, 60) - 12
+            if st.session_state.get("_melody_root_for_range") != melody_root:
+                st.session_state["low_midi_val"] = _root_midi_base
+                st.session_state["high_midi_val"] = _root_midi_base + 18
+                st.session_state["_melody_root_for_range"] = melody_root
             colA1, colA2 = st.columns(2, gap="small")
             with colA1:
-                low_midi = st.slider("Low MIDI", 24, 84, 55, 1, help="Register floor (C4=60).")
+                low_midi = st.slider("Low MIDI", 24, 84, _root_midi_base, 1,
+                                     help="Register floor. Defaults to the root note in octave 3; adjust to taste.",
+                                     key="low_midi_val")
                 step_bias = st.slider("Step bias", 0.0, 1.0, 0.5, 0.01, help="Probability of moving to a neighboring scale degree.")
-                glide_prob = st.slider("Glide prob", 0.0, 1.0, 0.25, 0.01, help="Probability of sliding into the next note.")
+                glide_prob = st.slider("Glide prob", 0.0, 1.0, 0.05, 0.01, help="Probability of sliding into the next note.")
             with colA2:
-                high_midi = st.slider("High MIDI", 36, 96, 79, 1, help="Register ceiling. Keep Low < High.")
+                high_midi = st.slider("High MIDI", 36, 96, _root_midi_base + 18, 1,
+                                      help="Register ceiling. Defaults to 1.5 octaves above Low MIDI.",
+                                      key="high_midi_val")
                 leap_steps = st.slider("Max leap (scale steps)", 1, 8, 7, 1, help="Largest jump when not stepping.")
                 glide_frac = st.slider("Glide frac", 0.0, 0.9, 0.35, 0.01, help="Portion of the note duration spent gliding.")
-            rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.12, 0.01, help="Chance of rests vs notes.")
+            rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.10, 0.01, help="Chance of rests vs notes.")
             drone_level = st.slider("Root drone level", 0.0, 1.0, 0.0, 0.05, help="Subtle sustained drone on the root note beneath the melody.")
+
+        with st.expander("Vowel character", expanded=False):
+            enable_formants = st.checkbox(
+                "Imprint vowels",
+                value=False,
+                help=(
+                    "Shape the melody imprint toward sung vowels. Off = a "
+                    "vowel-neutral buzz, which gives the AI more freedom and "
+                    "often hallucinates instruments better. On = pushes toward "
+                    "English-style sung diction. Turn on when you want clearer "
+                    "words, off for instrumental or open-ended results."
+                ),
+            )
+            vfcol1, vfcol2 = st.columns(2, gap="small")
+            with vfcol1:
+                formant_strength = st.slider(
+                    "Vowel strength", 0.0, 1.0, 0.6, 0.05,
+                    help=(
+                        "How hard the vowels are imprinted. Low = a hint the "
+                        "model can override; high = strong vowel character that "
+                        "can sound robotic if overdone. Start ~0.6 and tune by ear."
+                    ),
+                )
+            with vfcol2:
+                accent_period = st.selectbox(
+                    "Stress pattern",
+                    options=[2, 3, 4],
+                    index=0,
+                    help=(
+                        "Accented notes get full vowels; the rest reduce to a "
+                        "neutral 'schwa'. 2 = strong-weak (most English-like), "
+                        "3 = strong-weak-weak (more lilting). Vowel reduction is "
+                        "the acoustic signature of stress-timed English."
+                    ),
+                )
     else:
         # Provide defaults when melody disabled to keep variables defined
         melody_root = "E"
         melody_scale = "minor_blues"
         bpm = 96
-        low_midi, high_midi = 55, 79
-        step_bias, leap_steps, rest_prob = 0.5, 7, 0.12
+        _root_midi_base = NOTE_TO_MIDI.get(melody_root, 60) - 12
+        low_midi, high_midi = _root_midi_base, _root_midi_base + 18
+        step_bias, leap_steps, rest_prob = 0.5, 7, 0.10
         drone_level = 0.0
-        glide_prob, glide_frac = 0.25, 0.35
+        glide_prob, glide_frac = 0.05, 0.35
         vib_hz, vib_depth = 5.5, 0.02
         melody_character, note_shape = "neutral", "natural"
         note_decay = 1.0
+        enable_formants = False
+        formant_strength = 0.6
+        accent_period = 2
 
     # Add ~36px top margin before Drum header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -714,8 +782,10 @@ with left:
                 options=["clean", "tight", "deep", "bright", "breakbeat"],
                 index=0,
                 help=(
-                    "Applies a small set of lane tone/envelope presets. "
-                    "Breakbeat adds body, snap, and light saturation while keeping the MIDI groove."
+                    "Tonal preset for the drum layer. "
+                    "Clean: balanced default. Tight: shorter envelopes and snappier transients. "
+                    "Deep: bass-heavy low end with extra kick weight. Bright: more hat and upper-mid presence. "
+                    "Breakbeat: pumped body, snappy snare, and light drive — groove timing stays intact."
                 ),
             )
             snare_tune = st.slider(
@@ -752,7 +822,7 @@ with left:
         with tempo2:
             drum_bpm = st.slider(
                 "Independent drum BPM",
-                40,
+                20,
                 220,
                 value=int(st.session_state.get("drum_bpm_value", bpm)),
                 step=1,
@@ -818,7 +888,14 @@ with left:
                 "Bass character",
                 options=["Upright", "Fingerstyle", "Picked", "Synth", "Sub"],
                 index=1,
-                help="Changes the harmonic balance and frequency band to emulate different bass tones.",
+                help=(
+                    "Tonal preset for the bass imprint. "
+                    "Upright: warm, pluck-like decay in the low-mid range (40–800 Hz). "
+                    "Fingerstyle: balanced midrange tone (40–2000 Hz). "
+                    "Picked: bright with lots of harmonics and strong attack transient (40–5000 Hz). "
+                    "Sub: deep, smooth, low-frequency-only (30–200 Hz). "
+                    "Synth: odd-harmonic reed-like character with smooth envelope (30–3000 Hz)."
+                ),
             )
         with bcol2:
             bass_note_shape = st.selectbox(
@@ -852,7 +929,7 @@ with left:
         with btempo2:
             bass_bpm = st.slider(
                 "Independent bass BPM",
-                40,
+                20,
                 220,
                 value=int(st.session_state.get("bass_bpm_value", bpm)),
                 step=1,
@@ -875,10 +952,22 @@ with left:
             value=True,
             help="Repeats the bass MIDI when the prompt is longer than the MIDI region.",
         )
+        bass_trim_silence = st.checkbox(
+            "Trim silence before first note",
+            value=True,
+            help=(
+                "Removes empty lead-in before the first note "
+                "(e.g. Logic session-player exports add a phantom bar). "
+                "Preserves an intentional pickup or rest that's written on "
+                "the note itself. Turn off if your bass should start with "
+                "deliberate leading silence."
+            ),
+        )
     else:
         bass_character, bass_note_shape = "Fingerstyle", "natural"
         bass_decay_offset, bass_pb_range = 1.0, 12
         match_melody_bpm_bass, loop_bass = True, True
+        bass_trim_silence = True
         bass_bpm = int(bpm)
 
     # Add ~36px top margin before Focus header for clearer separation
@@ -929,7 +1018,7 @@ with left:
             with colf4:
                 floor_db = st.slider("Band floor (dB)", -36, 0, -18, 1, help="Attenuation outside the focus band.")
             with colf5:
-                sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Steepness of the band edges.")
+                sharpness = st.slider("Band edge sharpness", 6, 24, 12, 1, help="Sigmoid steepness of the band rolloff. 6 = gentle slope; 12 = moderate; 24 ≈ near-brick-wall. Dimensionless — not dB/Hz.")
             # Low‑end advanced controls hidden for now; using sensible defaults
     else:
         band = None
@@ -963,6 +1052,9 @@ with right:
         note_shape=note_shape,
         note_decay=float(note_decay),
         detune_spread_cents=7.0 if melody_character == "wide" else 0.0,
+        enable_formants=bool(enable_formants),
+        formant_strength=float(formant_strength),
+        accent_period=int(accent_period),
     )
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
     imprint_params = dict(gain=locals().get('imprint_gain', 8.0), harmonics=locals().get('harmonics', 10), bw_frac=locals().get('bw_frac', 0.01), floor_db=locals().get('floor_db', -18.0), sharpness=locals().get('sharpness', 12), n_fft=2048)
@@ -1175,7 +1267,11 @@ with right:
                 if enable_bass and bass_midi_file is not None:
                     try:
                         bass_seed_used = seed_to_use + 2
-                        bass_events, bass_bends, detected_bass_bpm = parse_midi_bass_events(bass_midi_file.getvalue(), pitch_bend_range=float(bass_pb_range))
+                        bass_events, bass_bends, detected_bass_bpm = parse_midi_bass_events(
+                            bass_midi_file.getvalue(),
+                            pitch_bend_range=float(bass_pb_range),
+                            trim_leading_silence=bool(bass_trim_silence),
+                        )
                         target_bass_bpm = float(bpm) if match_melody_bpm_bass else float(bass_bpm)
                         bass_speed_mult = target_bass_bpm / max(float(detected_bass_bpm), 1e-6)
                         _log_debug(
@@ -1279,6 +1375,10 @@ with right:
                         band if focus_params.get("preset") is None else None,
                     ),
                     "character": melody_character,
+                    "vowel": (
+                        f"EN-s{int(round(formant_strength * 100))}-a{accent_period}"
+                        if enable_melody and enable_formants else None
+                    ),
                 }
 
         # Outputs header
@@ -1329,6 +1429,10 @@ with right:
                         band if focus_params.get("preset") is None else None,
                     ),
                     "character": melody_character,
+                    "vowel": (
+                        f"EN-s{int(round(formant_strength * 100))}-a{accent_period}"
+                        if enable_melody and enable_formants else None
+                    ),
                 },
             )
             prompt_only_name_local = _download_name("prompt", base_stem_local, download_meta)
@@ -1478,7 +1582,7 @@ with right:
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
 st.markdown(
-    "<div class='footer-note'>Terms & Privacy: Upload only content you have rights to. By using this app you confirm you have permission to process any uploaded audio.</div>",
+    "<div class='footer-note'>Terms: Upload only content you own or have rights to. By using this app you confirm permission to process any uploaded audio.</div>",
     unsafe_allow_html=True,
 )
 
