@@ -1210,7 +1210,7 @@ with right:
             )
         with bl3:
             bass_blend_gain = st.slider(
-                "Bass blend",
+                "Bass level",
                 0.0, 2.0, 1.0, 0.05,
                 help="Gain for the bass MIDI layer, applied after loudness-matching all layers to the same RMS level.",
             )

@@ -84,7 +84,7 @@ Right column (Output & Seed, Layer Blend, Generate, Outputs)
 - Layer Blend
   - Melody level: Gain for the melody / focus / pink-noise layer.
   - Drum level: Gain for the drum MIDI layer.
-  - Bass blend: Gain for the bass MIDI layer.
+  - Bass level: Gain for the bass MIDI layer.
 - Generate & Outputs
   - Generate Prompt button
   - Prompt: In-page audio player and "Download prompt" button.
