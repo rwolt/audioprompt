@@ -631,19 +631,23 @@ with left:
                                       key="high_midi_val")
                 leap_steps = st.slider("Max leap (scale steps)", 1, 8, 7, 1, help="Largest jump when not stepping.")
                 glide_frac = st.slider("Glide frac", 0.0, 0.9, 0.35, 0.01, help="Portion of the note duration spent gliding.")
-            rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.10, 0.01, help="Chance of rests vs notes.")
-            drone_level = st.slider("Root drone level", 0.0, 1.0, 0.0, 0.05, help="Subtle sustained drone on the root note beneath the melody.")
-            icol1, icol2, icol3 = st.columns(3, gap="small")
+            rdcol1, rdcol2 = st.columns(2, gap="small")
+            with rdcol1:
+                rest_prob = st.slider("Rest prob", 0.0, 0.5, 0.10, 0.01, help="Chance of rests vs notes.")
+            with rdcol2:
+                drone_level = st.slider("Root drone level", 0.0, 1.0, 0.0, 0.05, help="Subtle sustained drone on the root note beneath the melody.")
+            icol1, icol2 = st.columns(2, gap="small")
             with icol1:
                 imprint_gain = st.slider("Imprint gain", 0.0, 16.0, 8.0, 0.5,
                     help="Strength of harmonic emphasis on the pink noise.")
             with icol2:
                 harmonics = st.slider("Harmonics", 0, 16, 10, 1,
                     help="Number of harmonic peaks in the pitch mask.")
-            with icol3:
-                bw_frac = st.slider("BW frac", 0.002, 0.05, 0.01, 0.001,
-                    help="Relative bandwidth around each harmonic. Wider = looser, "
-                         "less synthetic-sounding pitch lock; narrower = stricter pitch instruction.")
+            bw_frac = st.slider("BW frac", 0.002, 0.1, 0.01, 0.001,
+                help="Primary texture control. Narrow (0.005–0.01): tight pitch instruction, "
+                     "can sound synthetic. Widen (0.02–0.05) to make the melody feel less "
+                     "robotic without losing the harmonic steer. Go higher (0.05–0.1) for a "
+                     "very diffuse, atmospheric texture.")
 
         with st.expander("Vowel character", expanded=False):
             enable_formants = st.checkbox(
