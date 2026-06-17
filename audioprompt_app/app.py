@@ -980,25 +980,22 @@ with left:
         if matched_bass_seconds is not None:
             st.caption(f"Matched bass length: {matched_bass_seconds:.2f} sec at {target_bass_bpm_preview:g} BPM")
             
-        bchk1, bchk2 = st.columns(2, gap="small")
-        with bchk1:
-            loop_bass = st.checkbox(
-                "Loop bass to prompt length",
-                value=True,
-                help="Repeats the bass MIDI when the prompt is longer than the MIDI region.",
-            )
-        with bchk2:
-            bass_trim_silence = st.checkbox(
-                "Trim silence before first note",
-                value=True,
-                help=(
-                    "Removes empty lead-in before the first note "
-                    "(e.g. Logic session-player exports add a phantom bar). "
-                    "Preserves an intentional pickup or rest that's written on "
-                    "the note itself. Turn off if your bass should start with "
-                    "deliberate leading silence."
-                ),
-            )
+        loop_bass = st.checkbox(
+            "Loop bass to prompt length",
+            value=True,
+            help="Repeats the bass MIDI when the prompt is longer than the MIDI region.",
+        )
+        bass_trim_silence = st.checkbox(
+            "Trim silence before first note",
+            value=True,
+            help=(
+                "Removes empty lead-in before the first note "
+                "(e.g. Logic session-player exports add a phantom bar). "
+                "Preserves an intentional pickup or rest that's written on "
+                "the note itself. Turn off if your bass should start with "
+                "deliberate leading silence."
+            ),
+        )
         with st.expander("Bass – Advanced", expanded=False):
             bacol1, bacol2 = st.columns(2, gap="small")
             with bacol1:
