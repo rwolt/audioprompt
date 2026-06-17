@@ -15,6 +15,23 @@ def _rms_dbfs(y: np.ndarray) -> float:
     rms = float(np.sqrt(np.mean(y * y)) + 1e-12)
     return 20.0 * np.log10(rms)
 
+# Target RMS level used when loudness-matching layers before blending.
+# ~-20 dBFS. Adjust here to shift all layer blend levels up or down uniformly.
+TARGET_BLEND_RMS = 0.1
+
+def _normalize_to_rms(y: np.ndarray, target_rms: float = TARGET_BLEND_RMS) -> np.ndarray:
+    """Scale y so its RMS equals target_rms before blend-gain is applied.
+
+    Leaves near-silent arrays unscaled to avoid amplifying noise floor.
+    Caps the scale factor at 10x to prevent extreme gain on very sparse layers.
+    """
+    y = y.astype(np.float32, copy=False)
+    current_rms = float(np.sqrt(np.mean(y * y)) + 1e-12)
+    if current_rms < 1e-6:
+        return y
+    scale = min(target_rms / current_rms, 10.0)
+    return (y * scale).astype(np.float32)
+
 # Import core from ./src (ensure our local package takes precedence)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 # Import directly from submodules to avoid package-level side effects
@@ -903,7 +920,7 @@ with left:
             bass_character = st.selectbox(
                 "Bass character",
                 options=["Upright", "Fingerstyle", "Picked", "Synth", "Sub"],
-                index=1,
+                index=0,
                 help=(
                     "Tonal preset for the bass imprint. "
                     "Upright: warm, pluck-like decay in the low-mid range (40–800 Hz). "
@@ -989,7 +1006,7 @@ with left:
                     help="Relative bandwidth around each harmonic. Wider = looser, "
                          "less synthetic-sounding pitch lock.")
     else:
-        bass_character, bass_note_shape = "Fingerstyle", "natural"
+        bass_character, bass_note_shape = "Upright", "natural"
         bass_decay_offset, bass_pb_range = 1.0, 12
         match_melody_bpm_bass, loop_bass = True, True
         bass_trim_silence = True
@@ -1183,19 +1200,19 @@ with right:
             melody_blend_gain = st.slider(
                 "Melody level",
                 0.0, 2.0, 1.0, 0.05,
-                help="Gain for the melody / focus / pink-noise layer.",
+                help="Gain for the melody / focus / pink-noise layer, applied after loudness-matching all layers to the same RMS level.",
             )
         with bl2:
             drum_blend_gain = st.slider(
                 "Drum level",
                 0.0, 2.0, 1.0, 0.05,
-                help="Gain for the drum MIDI layer.",
+                help="Gain for the drum MIDI layer, applied after loudness-matching all layers to the same RMS level.",
             )
         with bl3:
             bass_blend_gain = st.slider(
                 "Bass blend",
                 0.0, 2.0, 1.0, 0.05,
-                help="Gain for the bass MIDI layer.",
+                help="Gain for the bass MIDI layer, applied after loudness-matching all layers to the same RMS level.",
             )
 
         # (Outputs header and preview toggle appear below, just before outputs)
@@ -1409,16 +1426,18 @@ with right:
             y_prompt_local = st.session_state["y_prompt"]
             sr_prompt_local = int(st.session_state.get("prompt_sr", int(sr)))
 
-            # Blend melody + drum + bass if they exist
-            y_render = (y_prompt_local * float(melody_blend_gain)).astype(np.float32)
-            
+            # RMS-normalize each layer to TARGET_BLEND_RMS before applying blend gains,
+            # so gain sliders at equal values produce comparable perceived loudness
+            # regardless of each layer's internal peak/density characteristics.
+            y_render = (_normalize_to_rms(y_prompt_local) * float(melody_blend_gain)).astype(np.float32)
+
             if "y_drum" in st.session_state:
-                y_drum_local = st.session_state["y_drum"]
+                y_drum_local = _normalize_to_rms(st.session_state["y_drum"])
                 min_len = min(len(y_render), len(y_drum_local))
                 y_render = y_render[:min_len] + (y_drum_local[:min_len] * float(drum_blend_gain))
-                
+
             if "y_bass" in st.session_state:
-                y_bass_local = st.session_state["y_bass"]
+                y_bass_local = _normalize_to_rms(st.session_state["y_bass"])
                 min_len = min(len(y_render), len(y_bass_local))
                 y_render = y_render[:min_len] + (y_bass_local[:min_len] * float(bass_blend_gain))
                 
