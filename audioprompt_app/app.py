@@ -664,6 +664,7 @@ with left:
                 harmonics = st.slider("Harmonics", 0, 16, 10, 1,
                     help="Number of harmonic peaks in the pitch mask.")
             bw_frac = st.slider("BW frac", 0.002, 0.1, 0.01, 0.001,
+                format="%.3f",
                 help="Primary texture control. Narrow (0.005–0.01): tight pitch instruction, "
                      "can sound synthetic. Widen (0.02–0.05) to make the melody feel less "
                      "robotic without losing the harmonic steer. Go higher (0.05–0.1) for a "
@@ -1006,6 +1007,7 @@ with left:
                     help="Strength of harmonic emphasis on the bass pitch mask.")
             with bacol2:
                 bass_bw_frac = st.slider("Bass BW frac", 0.002, 0.05, 0.01, 0.001,
+                    format="%.3f",
                     help="Relative bandwidth around each harmonic. Wider = looser, "
                          "less synthetic-sounding pitch lock.")
     else:
