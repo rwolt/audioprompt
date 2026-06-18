@@ -269,6 +269,9 @@ def _download_name(kind: str, base_stem: str | None, meta: dict) -> str:
     vowel = meta.get("vowel")
     if vowel:
         parts.append(f"vow-{vowel}")
+    bw = meta.get("bw_frac")
+    if bw is not None and abs(float(bw) - 0.01) > 1e-4:
+        parts.append(f"bw-{int(round(float(bw) * 1000))}")
     return "_".join(parts) + ".wav"
 st.markdown(
     """
@@ -1415,6 +1418,7 @@ with right:
                         f"EN-s{int(round(formant_strength * 100))}-a{accent_period}"
                         if enable_melody and enable_formants else None
                     ),
+                    "bw_frac": bw_frac if enable_melody else None,
                 }
 
         # Outputs header
@@ -1471,6 +1475,7 @@ with right:
                         f"EN-s{int(round(formant_strength * 100))}-a{accent_period}"
                         if enable_melody and enable_formants else None
                     ),
+                    "bw_frac": bw_frac if enable_melody else None,
                 },
             )
             prompt_only_name_local = _download_name("prompt", base_stem_local, download_meta)
