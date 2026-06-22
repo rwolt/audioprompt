@@ -736,6 +736,7 @@ with left:
     drum_bpm = int(bpm)
     match_melody_bpm = True
     loop_drums = True
+    drum_trim_silence = True
     drum_timing_preview = None
     st.session_state.setdefault("drum_bpm_value", int(bpm))
     if enable_drum:
@@ -883,9 +884,19 @@ with left:
                 "Turn off to let the drums stop after the uploaded MIDI ends."
             ),
         )
+        drum_trim_silence = st.checkbox(
+            "Trim silence before first note",
+            value=True,
+            help=(
+                "Removes empty lead-in before the first drum hit "
+                "(e.g. Logic session-player exports add a phantom bar). "
+                "Turn off if your drums genuinely start with deliberate leading silence."
+            ),
+        )
     else:
         drum_lane_gains = {"kick": 1.0, "snare": 0.9, "hat": 0.7, "perc": 0.5}
         drum_character, snare_tune, drum_decay = "clean", 0, 1.0
+        drum_trim_silence = True
 
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
     st.subheader("Bass MIDI Imprint")
@@ -1261,7 +1272,7 @@ with right:
                 if enable_drum and drum_midi_file is not None:
                     try:
                         drum_seed_used = seed_to_use + 1
-                        drum_lanes, detected_drum_bpm = parse_midi_drum_events(drum_midi_file.getvalue())
+                        drum_lanes, detected_drum_bpm = parse_midi_drum_events(drum_midi_file.getvalue(), trim_leading_silence=bool(drum_trim_silence))
                         target_drum_bpm = float(bpm) if match_melody_bpm else float(drum_bpm)
                         drum_speed_mult = target_drum_bpm / max(float(detected_drum_bpm), 1e-6)
                         _log_debug(

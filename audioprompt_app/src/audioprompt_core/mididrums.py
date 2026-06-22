@@ -122,6 +122,7 @@ def inspect_midi_timing(file_or_bytes: Union[str, Path, bytes, bytearray, BytesI
 
 def parse_midi_drum_events(
     file_or_bytes: Union[str, Path, bytes, bytearray, BytesIO],
+    trim_leading_silence: bool = True,
 ) -> Tuple[Dict[str, List[Tuple[float, float, int]]], float]:
     """Parse a MIDI drum track into lane events.
 
@@ -219,6 +220,21 @@ def parse_midi_drum_events(
     # Sort each lane by time
     for lane in lanes:
         lanes[lane].sort(key=lambda x: x[0])
+
+    # Strip phantom leading silence (e.g. DAW session-player exports prepend a
+    # phantom bar). For drums, leading silence lives in the first note's own
+    # delta rather than preceding controller messages, so we shift by the
+    # minimum start time across all lanes. A genuine pickup or intentional
+    # intro silence can be preserved by setting trim_leading_silence=False.
+    if trim_leading_silence:
+        all_starts = [s for events in lanes.values() for (s, _, _) in events]
+        if all_starts:
+            min_start = min(all_starts)
+            if min_start > 0.01:
+                lanes = {
+                    lane: [(s - min_start, d, v) for (s, d, v) in events]
+                    for lane, events in lanes.items()
+                }
 
     return lanes, bpm
 
