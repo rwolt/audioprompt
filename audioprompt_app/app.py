@@ -1028,6 +1028,11 @@ with left:
                     format="%.3f",
                     help="Relative bandwidth around each harmonic. Wider = looser, "
                          "less synthetic-sounding pitch lock.")
+            bass_noise_floor_db = st.slider("Bass noise floor (dB)", -60.0, 0.0, 0.0, 1.0,
+                help="Attenuation of non-harmonic noise within the bass focus band. "
+                     "0 dB = no attenuation (current behavior). Lower values reduce "
+                     "residual static inside the bass frequency window. Less impactful "
+                     "than melody noise floor since the bass focus band is already narrow.")
     else:
         bass_character, bass_note_shape = "Upright", "natural"
         bass_decay_offset, bass_pb_range = 1.0, 12
@@ -1035,6 +1040,7 @@ with left:
         bass_trim_silence = True
         bass_bpm = int(bpm)
         bass_imprint_gain, bass_bw_frac = 8.0, 0.01
+        bass_noise_floor_db = 0.0
 
     # Add ~36px top margin before Focus header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -1392,6 +1398,7 @@ with right:
                             sharpness=bass_imprint_params["sharpness"],
                             n_fft=bass_imprint_params["n_fft"],
                             character=bass_char_params["character"],
+                            melody_noise_floor_db=float(bass_noise_floor_db),
                         )
                         
                         # Apply velocity-sensitive rhythmic gate
