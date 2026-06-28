@@ -452,6 +452,7 @@ def build_prompt(
             detune_spread_cents=float(cp.get("detune_spread_cents", 0.0)),
             vowel_plan=vowel_plan,
             formant_strength=float(cp.get("formant_strength", 1.0)),
+            melody_noise_floor_db=float(imprint_params.get("melody_noise_floor_db", 0.0)),
         )
     elif enable_focus:
         y_prompt = imprint_melody_focus(
@@ -669,6 +670,11 @@ with left:
                      "can sound synthetic. Widen (0.02–0.05) to make the melody feel less "
                      "robotic without losing the harmonic steer. Go higher (0.05–0.1) for a "
                      "very diffuse, atmospheric texture.")
+            melody_noise_floor_db = st.slider("Noise floor (dB)", -60.0, 0.0, 0.0, 1.0,
+                help="Attenuation of non-harmonic pink noise. 0 dB = full noise floor (current "
+                     "behavior). Lower values reduce broadband static while keeping harmonic "
+                     "emphasis. Try –18 to –30 dB if the prompt is introducing extra noise into "
+                     "your AI music output.")
 
         with st.expander("Vowel character", expanded=False):
             enable_formants = st.checkbox(
@@ -721,6 +727,7 @@ with left:
         formant_strength = 0.6
         accent_period = 2
         imprint_gain, harmonics, bw_frac = 8.0, 10, 0.01
+        melody_noise_floor_db = 0.0
 
     # Add ~36px top margin before Drum header for clearer separation
     st.markdown("<div style='height: 36px'></div>", unsafe_allow_html=True)
@@ -1109,7 +1116,8 @@ with right:
     )
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
     imprint_params = dict(gain=imprint_gain, harmonics=harmonics, bw_frac=bw_frac,
-                          floor_db=floor_db, sharpness=sharpness, n_fft=2048)
+                          floor_db=floor_db, sharpness=sharpness, n_fft=2048,
+                          melody_noise_floor_db=melody_noise_floor_db)
     # Low-end config dict for core processing
     hpf_taps = 2049  # Steep by default
     lowend_cfg = dict(

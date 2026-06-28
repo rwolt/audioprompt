@@ -70,6 +70,7 @@ def imprint_melody_focus(
     detune_spread_cents: float = 0.0,
     vowel_plan=None,
     formant_strength: float = 1.0,
+    melody_noise_floor_db: float = 0.0,
 ) -> np.ndarray:
     hop = n_fft // 4
     # Use Hann window with default boundary handling to satisfy NOLA/overlap-add conditions
@@ -116,7 +117,8 @@ def imprint_melody_focus(
                 mask += 0.35 * weight * _mask_shape_kernel(freqs, fk / spread, bw, shape)
                 mask += 0.35 * weight * _mask_shape_kernel(freqs, fk * spread, bw, shape)
         if mask.max() > 0:
-            mask = 1.0 + (gain * (mask / mask.max()))
+            noise_floor_linear = 10.0 ** (melody_noise_floor_db / 20.0)
+            mask = noise_floor_linear + (gain * (mask / mask.max()))
             mag[:, i] *= mask
 
     if vowel_plan is not None:
