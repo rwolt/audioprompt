@@ -14,3 +14,7 @@ __pycache__/
 notebook_outputs/
 .venv/
 audioprompt_workbook.ipynb
+# Local scratch files
+audioprompt_app/install.cmd
+audioprompt_app/test_bend.mid
+audioprompt_app/test_midi.py
