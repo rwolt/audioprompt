@@ -162,7 +162,8 @@ python audioprompt.py prepend prompt.wav input.wav upload.wav
 ## 📄 Terms & Privacy
 - You retain all rights to your audio. You grant permission to process your uploaded file(s) for the purpose of generating prompts.
 - Do not upload third‑party copyrighted material without authorization.
-- This app does not store uploaded audio or user data. When hosted on Streamlit Community Cloud, Streamlit may collect anonymized platform analytics (e.g. visitor counts).
+- This app does not store uploaded audio or user data. By default the app collects no analytics at all — if you run it yourself (locally or self-hosted), nothing is tracked and nothing phones home unless you set the optional `GOATCOUNTER_URL` environment variable to point at your own analytics endpoint.
+- The public demo sets `GOATCOUNTER_URL` and uses [GoatCounter](https://www.goatcounter.com/) for privacy-friendly aggregate analytics: page views and referrers only. No cookies, no personal data, and no individual or cross-site tracking.
 
 ---
 

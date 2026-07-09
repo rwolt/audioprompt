@@ -1,169 +1,167 @@
-AudioPrompt (Streamlit)
+# AudioPrompt (Streamlit)
 
-Overview
-- Two-column Streamlit app for generating "audio prompts" that steer models: pink noise optionally imprinted with a randomized scale-constrained melody, optional spectral focus (bass/guitar/vocal/custom Hz band), rhythmic gating, a **Drum MIDI Imprint** layer, and a **Bass MIDI Imprint** layer with pitch bend and velocity support.
-- Drag-and-drop input (optional). The app always generates a prompt; it prepends the prompt to your input if a file is provided.
-- Big "Generate Prompt" button updates the audio when pressed; settings are adjustable between runs.
-- Downloads: prompt-only and combined (prepended) WAVs with tagged filenames.
+A two-column Streamlit app for generating **audio prompts** that steer AI music models: pink noise optionally imprinted with a randomized scale-constrained melody, optional spectral focus (bass/guitar/vocal/custom Hz band), rhythmic gating, a **Drum MIDI Imprint** layer, and a **Bass MIDI Imprint** layer with pitch-bend and velocity support.
 
-Quick Start
-1) Install
-   - python -m venv .venv && source .venv/bin/activate
-   - pip install -r requirements.txt
-2) Run
-   - streamlit run app.py
-3) Use
-   - Left column: upload (optional), set toggles, choose Prompt seconds and melody.
-   - Right column: (optional) set Focus and Output settings, press Generate Prompt, then preview/download.
+- Drag-and-drop input audio (optional). The app always generates a prompt; if you provide a file, the prompt is **prepended** to it to create a combined output.
+- Press **Generate Prompt** to render; settings are adjustable between runs.
+- Download prompt-only and combined WAVs with tagged filenames.
 
-Supported formats
-- Input: WAV/FLAC/OGG/AIFF via libsndfile. (MP3/M4A are not guaranteed; convert to WAV for best reliability.)
-- Output: WAV (PCM16).
+## Quick Start
 
-UI Layout & Features
-Left column (Controls)
-- Input & Output
-  - Input audio (optional): Drag and drop a file (styled drop zone). If provided, the prompt is prepended to create a combined output.
-  - Sample rate: Default 48000 Hz. All processing runs at this rate; inputs are resampled.
-- Toggles
-  - Enable melody: Imprint a randomized melody (scale-constrained) onto pink noise.
-  - Enable focus band: Emphasize energy in a preset band (vocal/guitar/bass) or a custom Hz range.
-  - Enable rhythmic gate: Apply a syllabic/phrase-like amplitude envelope from the melody events.
-- Prompt length: Without drum MIDI, use the Prompt seconds slider. With drum MIDI, Match drum MIDI is the default and uses the uploaded MIDI region length adjusted to the target drum BPM; Manual seconds is still available up to 20 seconds.
-- Melody (when enabled)
-  - Root, Scale: Choose any from the built-in list (includes minor_blues, pentatonic, modes, etc.).
-  - BPM: Tempo used for randomized event durations. If you also uploaded a Drum MIDI, match this BPM to the drum track.
-  - Melody character: Harmonic color preset for the imprinted melody. Neutral: flat harmonic stack. Warm: rolls off high harmonics for a mellow tone. Voice: emphasizes low harmonics (1–5) for a vocal buzz. Reed: odd harmonics only (clarinet-like). Bell: peaks around the 3rd harmonic. Pluck: fast harmonic decay. Bright: boosts higher harmonics for more edge. Wide: neutral harmonics with a 7-cent detune spread for subtle thickness.
-  - Note shape: Sets the rhythmic envelope feel for imprinted notes. Tight and pluck have exponential decays; smooth has a softer attack.
-  - Note decay: Scales the envelope decay length — lower values give staccato notes, higher values let notes ring longer.
-  - Range (Low/High MIDI): Register for the melody notes.
-  - Step bias / Max leap: Controls stepwise motion vs. larger interval jumps. Leaps are weighted toward characteristic scale intervals and the root for more musical results.
-  - Rest prob: Fraction of time devoted to rests.
-  - Glide prob/frac: Probability and portion of each note gliding toward the next.
-  - Vibrato Hz/Depth: Subtle expressive pitch modulation.
-  - Root drone level (Advanced): Adds a sustained sine+triangle drone two octaves below the root underneath the melody. Useful for grounding the harmonic content.
-  - Vowel character (expander, when melody enabled)
-    - Imprint vowels: Toggle off (default) for vowel-neutral buzz that lets the AI invent sounds freely. Toggle on to push toward English-style sung diction.
-    - Vowel strength: How hard the vowels are imprinted (0–1). Start around 0.6; above ~0.9 can sound robotic.
-    - Stress pattern: Accented notes (every 2nd/3rd/4th) get a full vowel; weak beats reduce to schwa. 2 = strong-weak (most English-like), 3 = more lilting.
-- Drum MIDI Imprint (when enabled)
-  - Drum MIDI (.mid / .midi): Upload a General MIDI drum track exported from your DAW or drum sequencer.
-  - Per-lane gains: Kick, Snare, Hat, Perc amounts. These are broad noise lanes, not separate sample instruments.
-  - Drum character: Clean, tight, deep, bright, or breakbeat lane presets. These shift lane bands, decay, and light drive under the hood.
-  - Snare tune: Shifts the snare noise band by semitones before synthesis, so the snare can sit lower or higher without changing MIDI note mapping.
-  - Drum decay: Global envelope length for the drum layer. Lower values are tighter; higher values ring longer.
-  - Match melody BPM: Uses the Melody BPM as the drum target tempo.
-  - Use detected BPM: Resets the independent drum BPM to the tempo found in the uploaded MIDI.
-  - Independent drum BPM: Independent target tempo for the uploaded MIDI when Match melody BPM is off. New uploads start at their detected MIDI BPM, so unchecking Match melody BPM returns to the original groove tempo.
-  - Loop drums to prompt length: Repeats the uploaded MIDI when the prompt is longer than the MIDI region. Turn it off to let drums stop after the uploaded MIDI ends.
-- Bass MIDI Imprint (when enabled)
-  - Bass MIDI (.mid / .midi): Upload a MIDI bass track exported from your DAW. Pitch bend and note velocity are preserved.
-  - Bass character: Upright, Fingerstyle, Picked, Synth, or Sub. Changes harmonic balance and frequency band to emulate different bass tones.
-  - Note shape base: Base envelope shape (natural/tight/pluck/smooth) before decay offset and velocity are applied.
-  - Decay offset: Scales the bass note envelope decay length.
-  - Pitch bend range: Must match the pitch wheel range set in the virtual instrument that generated the MIDI (Logic slides often use 12, 24, or 48 semitones).
-  - Match melody BPM (Bass): Use the melody BPM for the bass layer tempo.
-  - Use detected BPM: Resets the independent bass BPM to the tempo found in the uploaded MIDI.
-  - Independent bass BPM: Independent target tempo when Match melody BPM is off.
-  - Loop bass to prompt length: Repeats the uploaded MIDI when the prompt is longer than the bass region.
-  - Trim silence before first note: Removes empty lead-in before the first note (e.g. Logic session-player exports add a phantom bar). Preserves any intentional pickup or rest written into the note's own timing. Turn off when your bass genuinely starts with leading silence.
-- Focus (when enabled)
-  - Preset: vocal (approximately 120-3200 Hz), guitar (approximately 80-6000 Hz), bass (approximately 40-300 Hz), or custom.
-  - Custom band: Twin-handle Hz slider for low/high cutoff.
-  - Imprint gain: Strength of harmonic emphasis around the melody's partials.
-  - Harmonics: Number of harmonics in the emphasis mask.
-  - BW frac: Primary texture control. Narrow (0.005–0.01) = tight pitch instruction; wider (0.02–0.05) feels less robotic; 0.05–0.1 gives a diffuse, atmospheric texture.
-  - Band floor (dB): Attenuation outside the focused band.
-  - Band edge sharpness: Sigmoid steepness controlling how sharply the spectrum rolls off outside the focus band. 6 = gentle slope; 12 = moderate; 24 ≈ near-brick-wall. Dimensionless — not dB/Hz.
+```bash
+# 1. Install
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 
-Right column (Output & Seed, Layer Blend, Generate, Outputs)
-- Output & Seed
-  - Prompt gain (dB): Level applied when prepending to the input track.
-  - Fade-in/out (ms): Smooth start/end on the prepended prompt segment.
-  - Seed: Controls randomness for pink noise and melody generation. Default is -1 (new random seed each generation). Set to a fixed integer for reproducible results.
-- Layer Blend
-  - Melody level: Gain for the melody / focus / pink-noise layer.
-  - Drum level: Gain for the drum MIDI layer.
-  - Bass level: Gain for the bass MIDI layer.
-- Generate & Outputs
-  - Generate Prompt button
-  - Prompt: In-page audio player and "Download prompt" button.
-  - Combined: In-page audio player and "Download combined" button (enabled if an input file is uploaded).
-  - Status messages: Informative notes when only prompt is generated or if format issues occur.
+# 2. Run
+streamlit run app.py
+```
 
-Filename tagging
-- Output names use compact tags for the most important generation settings.
-  - Prompt only: ap_prompt_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav
-  - Combined: my-song-take-1_combined_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav
-  - Tags: r = root, s = scale, mb = melody BPM, ms = melody/noise seed, db = drum BPM, ds = drum seed. Focus appears only when enabled, e.g. f-voc or f-b120-3200. Character appears only when non-neutral, e.g. ch-voice. Vowel character appears when enabled, e.g. vow-EN-s60-a2 (strength 60%, accent period 2).
+Then in the app:
 
-MIDI Drum Map (General MIDI -> lanes)
-- AudioPrompt follows General MIDI drum note numbers. Use the MIDI number as the source of truth: octave labels vary by DAW, so MIDI 36 may appear as C1, C2, or another octave label depending on the piano-roll setting.
-| MIDI notes | Possible piano-roll labels | Lane | Typical source |
-|------------|-------------------------|------|----------------|
-| 35, 36 | Often B0/C1 or B1/C2 | kick | Acoustic Kick, Bass Drum |
-| 37, 38, 39, 40 | Often C#1/D1/D#1/E1 or C#2/D2/D#2/E2 | snare | Side Stick, Acoustic Snare, Clap, Electric Snare |
-| 41, 43, 45, 47, 48, 50 | Toms; labels vary by octave setting | snare | Tom notes currently share the snare/body lane |
-| 42, 44, 46 | Often F#1/G#1/A#1 or F#2/G#2/A#2 | hat | Closed, Pedal, Open Hi-Hat |
-| 49, 51, 52, 55, 57, 59 | Cymbals; labels vary by octave setting | hat | Crash/Ride/Splash cymbals share the hat lane |
-| 54, 56, 58, 62-85, and all other unlisted notes | varies | perc | Tambourine, Cowbell, Congas, Bongos, Claves, etc. — and any note not mapped above |
-- Every MIDI note not matched by the kick/snare/hat rows is routed to the perc lane. This includes non-GM notes and any unexpected hits from your DAW.
-- The parser reads all tracks because some DAWs export drums across multiple tracks.
-- For the quickest setup from Logic Session Drummer, export/convert the drummer region to MIDI and leave the notes on their General MIDI drum pitches. Start with kick/snare/hat, then use Perc amount if your groove includes auxiliary percussion.
+1. **Left column** — upload input audio (optional), enable Melody / Drum MIDI / Bass MIDI layers, and set Focus.
+2. **Right column** — choose the prompt length, press **Generate Prompt**, then preview and download.
 
-Drum MIDI Imprint notes
-- Each lane (kick / snare / hat / perc) is generated from its own band-limited pink noise source with velocity-sensitive envelopes.
-- Perc is a real fourth noise lane for miscellaneous percussion, but it is intentionally generic in this prototype.
-- Velocity controls both loudness and decay time: ghost notes (low velocity) are softer and shorter; hard hits (high velocity) are louder and longer.
-- Drum character controls are deliberately compact: they prove tone/tuning/decay control without adding a full synthesizer panel.
-- Drum BPM is a target tempo, not pitch shifting. A 100 BPM MIDI file rendered at 125 BPM has its event times scaled by 1.25x.
-- Match drum MIDI prompt length uses the MIDI region length from the longest track, then adjusts that length to the target drum BPM.
-- Loop drums repeats the parsed MIDI event pattern when the prompt is longer than the MIDI region; disable it when you want the drums to stop after the uploaded MIDI ends.
-- Use the Layer Blend sliders to balance melody level vs. drum level.
-- For drums-only output: disable Melody and Focus, enable Drum MIDI Imprint, and click Generate.
+### Supported formats
 
-Performance & Limits
-- Defaults are tuned for responsiveness: 48 kHz, 4 s prompts, n_fft=2048.
-- Recommend prompt seconds 3-6 for clear steer without masking.
-- Manual prompt seconds are capped at 20 by the UI. Match drum MIDI can produce longer prompts when the uploaded MIDI region is longer.
-- Input files are resampled to SR; large multi-minute files are not recommended (trim externally).
+- **Input:** WAV / FLAC / OGG / AIFF via libsndfile. (MP3/M4A are not guaranteed; convert to WAV for best reliability.)
+- **Output:** WAV (PCM16).
 
-How it works (core pieces)
-- Pink noise: 1/sqrt(f) spectrum generated in the frequency domain.
-- Melody imprint: STFT magnitude shaped by time-varying harmonic masks built from an f0 trajectory.
-- Melody character: musician-facing presets alter harmonic weights, note envelope shape, and optional doubled-mask spread.
-- Randomized melody: scale-constrained note events with weighted random walk — leaps prefer the root and characteristic scale intervals, and an opening motif introduces the scale's defining intervals at the start.
-- Root drone: a sine+triangle wave two octaves below the root, mixed under the melody at a user-controlled level.
-- Focus band: global EQ mask in log-frequency with soft edges and outside-band floor.
-- Gate: time-domain velocity-sensitive envelope matched to note onsets/offsets.
-- Drum MIDI Imprint: parses MIDI note events, maps them to lanes, generates band-limited pink noise per lane, applies velocity-sensitive AD envelopes, then applies compact tone/tune/decay presets.
-- Bass MIDI Imprint: parses bass MIDI note events with pitch bend, generates a continuous f0 trajectory (including legato slides and bend curves), imprints it onto pink noise using the same STFT mask engine as melody, and applies a velocity-sensitive rhythmic gate.
-- Vowel character (optional): builds a vowel plan from melody events — accented notes (every 2nd/3rd, selectable) get a full English vowel, weak beats reduce to schwa. That long-strong-then-reduced alternation is the acoustic signature of stress-timed English. Resolves the plan into a per-STFT-frame F1/F2/F3 trajectory with short glides between targets, then multiplies a sum-of-Lorentzian-resonances envelope into the STFT magnitude (same compositional layer as the focus band). A strength control blends from no effect to full character. Disabled by default; when off, output is unchanged.
+## Configuration (environment variables)
 
-Troubleshooting
-- "Failed to read input audio": Convert to WAV/FLAC/OGG; ensure the app has file read permission.
-- macOS privacy: If running locally and reading from protected folders (e.g., Documents), grant Full Disk Access to your terminal/IDE.
-- Clipping: If combined output sounds harsh, reduce Prompt gain (dB) or increase fade-in/out.
-- Weak steer: Increase Imprint gain and/or Harmonics; narrow BW frac; extend Prompt seconds.
-- Drum MIDI upload fails: Try the click-to-browse button instead of drag-and-drop. Ensure the file is a valid .mid / .midi.
-- Drums too quiet in mix: Raise the Drum level blend slider, or lower Melody level.
+Both are optional. With neither set, the app runs fully unrestricted and collects nothing — this is the default for local use and self-hosting.
 
-Deploying publicly (Streamlit Community Cloud)
-1) Push this folder to GitHub.
-2) Create a new Streamlit app, point to app.py, and select the repo.
-3) It installs requirements.txt and runs automatically; no secrets are needed.
-- Note: Streamlit Community Cloud may collect anonymized platform analytics (e.g. visitor counts). This app does not store uploaded audio or any user data.
+| Variable | Effect when set | Default (unset) |
+|----------|-----------------|-----------------|
+| `AUDIOPROMPT_MAX_SECONDS` | Caps the resolved prompt length (all length modes). Over-cap renders are blocked with a warning — never truncated. The public demo uses `60`. | No cap |
+| `GOATCOUNTER_URL` | Injects a [GoatCounter](https://www.goatcounter.com/) analytics snippet pointed at this endpoint (aggregate page views + referrers; no cookies, no personal data). | No analytics, nothing phones home |
 
-Code structure
-- app.py: Streamlit UI and orchestration.
-- src/audioprompt_core/
-  - audio.py: audio loading, fades, WAV bytes, filename tagging.
-  - melody.py: scales, random melody generation, f0 trajectory.
-  - prompt.py: pink noise, melody imprint with optional focus, rhythmic gate.
-  - mididrums.py: MIDI drum track parsing and lane mapping.
-  - drumnoise.py: per-lane band-limited pink noise synthesis with velocity envelopes.
-  - midibass.py: bass MIDI parsing with pitch bend, legato slide, and BPM scaling.
-  - formants.py: English vowel formant tables, vowel plan assignment, per-frame F1/F2/F3 trajectory, and STFT magnitude envelope application.
+## UI Reference
 
-License
-- MIT - see ../../LICENSE. This app is part of the AudioPrompt repository and is covered by the root license.
+### Left column — layers & focus
+
+**Input & sample rate**
+
+- **Input audio (optional):** drag and drop. If provided, the prompt is prepended to create a combined output.
+- **Sample rate:** default 48000 Hz. All processing runs at this rate; inputs are resampled.
+
+**Melody** (when enabled)
+
+- **Root / Scale:** any of the built-in scales (modes, pentatonics, blues, etc.).
+- **BPM:** tempo for randomized note durations. If you uploaded drum MIDI, match this to the drum track.
+- **Melody character:** harmonic color preset — neutral, warm, voice, reed, bell, pluck, bright, or wide (7-cent detune spread).
+- **Note shape / Note decay:** envelope feel for imprinted notes; lower decay = staccato.
+- **Advanced:** MIDI range (low/high), step bias vs. leaps, rest probability, glides, vibrato, root drone level, imprint gain, harmonics, **BW frac** (the primary texture control — narrow = tight pitch instruction, wide = diffuse), and **noise floor (dB)** to attenuate non-harmonic static.
+- **Vowel character (expander):** off by default (vowel-neutral buzz gives the AI freedom). On = pushes toward English-style sung diction, with strength and stress-pattern controls.
+
+**Drum MIDI Imprint** (when enabled)
+
+- **Drum MIDI (.mid/.midi):** upload a General MIDI drum track. Detected BPM and length are shown on upload.
+- **Per-lane gains:** Kick / Snare / Hat / Perc amounts (broad noise lanes, not sample instruments).
+- **Drum character / Snare tune / Drum decay:** compact tone, tuning, and envelope-length controls.
+- **Match melody BPM / Independent drum BPM / Use detected BPM:** tempo targeting. New uploads start at their detected MIDI BPM.
+- **Loop drums to prompt length:** repeats the MIDI when the prompt is longer than the region.
+- **Trim silence before first note:** strips empty lead-in (e.g. Logic session-player exports add a phantom bar).
+
+**Bass MIDI Imprint** (when enabled)
+
+- **Bass MIDI (.mid/.midi):** pitch bend and note velocity are preserved. Detected BPM and length are shown on upload.
+- **Bass character:** Upright, Fingerstyle, Picked, Synth, or Sub — changes harmonic balance and frequency band.
+- **Note shape base / Decay offset:** envelope controls before velocity is applied.
+- **Pitch bend range:** must match the pitch-wheel range of the instrument that generated the MIDI (Logic slides often use 12, 24, or 48 semitones).
+- **Tempo, looping, and trim-silence controls:** same pattern as the drum layer.
+- **Advanced:** bass imprint gain, BW frac, and noise floor (dB).
+
+**Focus** (when enabled)
+
+- **Preset:** vocal (~120–3200 Hz), guitar (~80–6000 Hz), bass (~40–300 Hz), or custom twin-handle Hz band.
+- **Band floor (dB):** attenuation outside the focused band.
+- **Band edge sharpness:** sigmoid rolloff steepness (6 = gentle, 12 = moderate, 24 ≈ near-brick-wall).
+- **Bass Roll-Off:** 25 Hz high-pass on the prompt noise (on by default); does not EQ your uploaded audio.
+
+### Right column — generate & outputs
+
+- **Generate Prompt** button and **Seed** (default −1 = new random seed each generation; set a fixed integer for reproducible results).
+- **Prompt length:** *Match bass MIDI*, *Match drum MIDI* (when the respective MIDI is loaded; region length adjusted to target BPM), or *Manual seconds* (1–20 s). The resolved length is shown beneath the control.
+- **Prompt Level:** auto gain (match input audio RMS with a relative dB offset) or manual prompt gain, plus fade-in/out.
+- **Layer Blend:** Melody / Drum / Bass level sliders — layers are loudness-matched to the same RMS before these gains apply.
+- **Outputs:** in-page players and download buttons for Prompt and (with input audio) Combined.
+
+## Filename tagging
+
+Output names encode the key generation settings:
+
+- Prompt only: `ap_prompt_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav`
+- Combined: `my-song-take-1_combined_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav`
+
+Tags: `r` = root, `s` = scale, `mb` = melody BPM, `ms` = melody/noise seed, `db` = drum BPM, `ds` = drum seed, `len` = length. Focus appears only when enabled (`f-voc`, `f-b120-3200`); character only when non-neutral (`ch-voice`); vowel character when enabled (`vow-EN-s60-a2` = strength 60%, accent period 2); `bw-N` when BW frac differs from the 0.01 default.
+
+## MIDI drum map (General MIDI → lanes)
+
+AudioPrompt follows General MIDI drum note numbers. Use the MIDI number as the source of truth — octave labels vary by DAW, so MIDI 36 may appear as C1, C2, or another label depending on the piano-roll setting.
+
+| MIDI notes | Typical piano-roll labels | Lane | Typical source |
+|------------|---------------------------|------|----------------|
+| 35, 36 | B0/C1 or B1/C2 | kick | Acoustic Kick, Bass Drum |
+| 37, 38, 39, 40 | C#1–E1 or C#2–E2 | snare | Side Stick, Acoustic Snare, Clap, Electric Snare |
+| 41, 43, 45, 47, 48, 50 | varies (toms) | snare | Toms currently share the snare/body lane |
+| 42, 44, 46 | F#1/G#1/A#1 or F#2/G#2/A#2 | hat | Closed, Pedal, Open Hi-Hat |
+| 49, 51, 52, 55, 57, 59 | varies (cymbals) | hat | Crash/Ride/Splash share the hat lane |
+| 54, 56, 58, 62–85, all others | varies | perc | Tambourine, Cowbell, Congas, etc. — and any unmapped note |
+
+Notes:
+
+- Every note not matched by the kick/snare/hat rows routes to the **perc** lane, including non-GM notes.
+- The parser reads **all tracks**, since some DAWs export drums across multiple tracks.
+- Quickest setup from Logic Session Drummer: convert the drummer region to MIDI and leave notes on their GM drum pitches. Start with kick/snare/hat, then use Perc amount for auxiliary percussion.
+
+## How it works (core pieces)
+
+- **Pink noise:** 1/√f spectrum generated in the frequency domain.
+- **Melody imprint:** STFT magnitude shaped by time-varying harmonic masks built from an f0 trajectory.
+- **Randomized melody:** scale-constrained note events with a weighted random walk — leaps prefer the root and characteristic scale intervals.
+- **Focus band:** global EQ mask in log-frequency with soft edges and an outside-band floor.
+- **Rhythmic gate:** time-domain velocity-sensitive envelope matched to note onsets/offsets.
+- **Drum MIDI Imprint:** maps MIDI events to lanes, generates band-limited pink noise per lane with velocity-sensitive AD envelopes (velocity controls both loudness and decay), then applies tone/tune/decay presets. Drum BPM is a *target tempo* — event times are scaled, not pitch-shifted.
+- **Bass MIDI Imprint:** parses notes with pitch bend into a continuous f0 trajectory (legato slides and bend curves included) and imprints it via the same STFT mask engine as the melody.
+- **Vowel character (optional):** accented notes get a full English vowel, weak beats reduce to schwa — the acoustic signature of stress-timed English — resolved into a per-frame F1/F2/F3 formant envelope multiplied into the STFT magnitude. When off, output is unchanged.
+
+## Performance & limits
+
+- Defaults are tuned for responsiveness: 48 kHz, 4 s prompts, n_fft = 2048.
+- 3–6 s prompts give a clear steer without masking.
+- Manual prompt seconds are capped at 20 by the UI; *Match drum MIDI* / *Match bass MIDI* can produce longer prompts when the uploaded region is longer. If `AUDIOPROMPT_MAX_SECONDS` is set (e.g. the public demo's 60 s), over-cap renders are blocked with a clear warning.
+- Input files are resampled to the working sample rate; trim large multi-minute files externally.
+
+## Troubleshooting
+
+- **"Failed to read input audio":** convert to WAV/FLAC/OGG; ensure the app has file read permission.
+- **macOS privacy:** if reading from protected folders (e.g. Documents), grant Full Disk Access to your terminal/IDE.
+- **Clipping:** reduce Prompt gain (dB) or increase fade-in/out.
+- **Weak steer:** increase Imprint gain and/or Harmonics; narrow BW frac; extend the prompt length.
+- **MIDI upload fails:** try click-to-browse instead of drag-and-drop; ensure a valid `.mid`/`.midi` file.
+- **Drums too quiet in the mix:** raise the Drum level blend slider, or lower Melody level.
+
+## Deploying publicly
+
+1. Push the repo to GitHub and point your host (Railway, Streamlit Community Cloud, etc.) at `audioprompt_app/app.py`.
+2. It installs `requirements.txt` and runs; no secrets are required.
+3. Recommended env vars for a public demo: `AUDIOPROMPT_MAX_SECONDS=60` and `GOATCOUNTER_URL=<your GoatCounter endpoint>` (see Configuration above).
+
+The app does not store uploaded audio or any user data. Analytics exist only when the operator sets `GOATCOUNTER_URL`.
+
+## Code structure
+
+- `app.py` — Streamlit UI and orchestration.
+- `src/audioprompt_core/`
+  - `audio.py` — audio loading, fades, WAV bytes.
+  - `melody.py` — scales, random melody generation, f0 trajectory.
+  - `prompt.py` — pink noise, melody imprint with optional focus, rhythmic gate.
+  - `mididrums.py` — MIDI drum track parsing and lane mapping.
+  - `drumnoise.py` — per-lane band-limited pink noise synthesis with velocity envelopes.
+  - `midibass.py` — bass MIDI parsing with pitch bend, legato slides, and BPM scaling.
+  - `formants.py` — English vowel formant tables and STFT formant envelopes.
+
+## License
+
+MIT — see [`../LICENSE`](../LICENSE). This app is part of the AudioPrompt repository and is covered by the root license.

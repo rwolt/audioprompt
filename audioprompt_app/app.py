@@ -72,6 +72,34 @@ from audioprompt_core.drumnoise import (
 
 st.set_page_config(page_title="AudioPrompt", layout="wide")
 
+# Optional render cap for public hosting. Unset/empty/invalid = no cap, so
+# local runs (and forks) behave exactly as before; the hosted demo sets e.g.
+# AUDIOPROMPT_MAX_SECONDS=60. All cap-related UI is hidden when no cap is set.
+def _max_prompt_seconds() -> float | None:
+    raw = os.environ.get("AUDIOPROMPT_MAX_SECONDS", "").strip()
+    if not raw:
+        return None
+    try:
+        val = float(raw)
+    except ValueError:
+        return None
+    return val if val > 0 else None
+
+MAX_PROMPT_SECONDS = _max_prompt_seconds()
+
+# Optional GoatCounter analytics endpoint. Unset (the default for local dev and
+# anyone self-hosting a clone) = no analytics, no network calls, nothing phones
+# home. The hosted demo sets e.g.
+# GOATCOUNTER_URL=https://audioprompt.goatcounter.com/count; forks can point it
+# at their own dashboard.
+GOATCOUNTER_URL = os.environ.get("GOATCOUNTER_URL", "").strip() or None
+
+_CAP_HELP_NOTE = (
+    f" Note: the public demo caps prompt length at {MAX_PROMPT_SECONDS:g} s."
+    if MAX_PROMPT_SECONDS is not None
+    else ""
+)
+
 # ------------------------------ Debug helpers ------------------------------ #
 def _mem_usage_mb() -> float | None:
     """Best-effort current RSS in MB.
@@ -323,6 +351,11 @@ st.markdown(
     div[data-testid="stElementContainer"]:has(> iframe[data-testid="stIFrame"][srcdoc*="attachDragHighlight"]) {
         display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important;
     }
+    /* Hide the GoatCounter injector iframe the same way */
+    iframe[data-testid="stIFrame"][srcdoc*="injectGoatCounter"] { display: none !important; height: 0 !important; visibility: hidden !important; }
+    div[data-testid="stElementContainer"]:has(> iframe[data-testid="stIFrame"][srcdoc*="injectGoatCounter"]) {
+        display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important;
+    }
     /* Attractive pill-styled placeholder blocks (blue) */
     .spec-placeholder {
         width: 100%;
@@ -363,6 +396,33 @@ _DRAG_JS = """
   })();
 </script>
 """
+
+# GoatCounter analytics injector (only used when GOATCOUNTER_URL is set).
+# Approach: st.markdown(unsafe_allow_html=True) can't be used — browsers never
+# execute <script> tags inserted via innerHTML — and loading count.js directly
+# inside components.html would run it in the sandboxed iframe, reporting the
+# iframe's srcdoc location and losing the real page referrer (e.g. suno.com).
+# Streamlit component iframes are same-origin, though, so this snippet creates
+# the <script data-goatcounter="..." async src="//gc.zgo.at/count.js"></script>
+# element in the PARENT (top-level) document, where count.js sees the true URL
+# and referrer. count.js also ignores localhost by default.
+def _goatcounter_js(endpoint: str) -> str:
+    import json
+    return """
+<script>
+  (function injectGoatCounter(){
+    try {
+      var doc = window.parent.document;
+      if (doc.querySelector('script[data-goatcounter]')) return; // once per page
+      var s = doc.createElement('script');
+      s.setAttribute('data-goatcounter', %s);
+      s.async = true;
+      s.src = '//gc.zgo.at/count.js';
+      doc.head.appendChild(s);
+    } catch (e) { /* parent inaccessible; skip silently */ }
+  })();
+</script>
+""" % json.dumps(endpoint)
 
 
 def clamp(v, lo, hi):
@@ -506,12 +566,12 @@ with top_left:
     st.subheader("Quick Start")
     st.markdown(
         """
-        AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It imprints a scale‑based melody, emphasizes a frequency band, and can prepend the prompt to your input audio.
+        AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It imprints a scale‑based melody, adds optional drum and bass layers from your MIDI files, emphasizes a frequency band, and can prepend the prompt to your input audio.
 
         1. (Optional) Drag‑drop input audio — the prompt will be **prepended** to it to create a combined WAV. Leave empty for a prompt-only WAV. A 1–2 bar drum loop works great as a starting point.
-        2. Set Prompt seconds and choose Melody settings (root/scale/BPM).
-        3. Use Focus (or Custom band) and enable Bass Roll-Off for cleaner prompt starts.
-        4. Click Generate Prompt. Preview the Prompt, and if input audio is provided, the Combined result. Download the tagged WAVs.
+        2. Choose Melody settings (root/scale/BPM). Optionally enable the Drum and Bass MIDI Imprint sections and upload .mid files to add rhythm and bassline layers.
+        3. Use Focus (or Custom band) and keep Bass Roll-Off on for cleaner prompt starts.
+        4. On the right, set Prompt length — match an uploaded MIDI or use manual seconds — then click Generate Prompt. Preview the Prompt (and Combined, if input audio was provided) and download the tagged WAVs.
 
         Tips: 3–6 s prompts give a clear steer without masking; “Vocal” focus often helps melody “speak”.
         """
@@ -1140,7 +1200,11 @@ with right:
         st.markdown("<div class='gen-row'>", unsafe_allow_html=True)
         btn_col, seed_col = st.columns([3,1], gap="medium")
         with btn_col:
-            pressed = st.button("Generate Prompt", type="primary", width="stretch")
+            # Placeholder: the button is rendered further down, once the
+            # resolved prompt length is known, so it can be disabled when an
+            # active AUDIOPROMPT_MAX_SECONDS cap is exceeded. Visual position
+            # in the page is unchanged.
+            gen_btn_slot = st.empty()
         with seed_col:
             seed = st.number_input(
                 "Seed",
@@ -1172,7 +1236,7 @@ with right:
                 options=prompt_len_opts,
                 index=0,
                 horizontal=True,
-                help="Match length to uploaded MIDI regions (adjusted to target BPM) or use manual seconds.",
+                help="Match length to uploaded MIDI regions (adjusted to target BPM) or use manual seconds." + _CAP_HELP_NOTE,
             )
         else:
             prompt_length_mode = "Manual seconds"
@@ -1184,7 +1248,11 @@ with right:
             4.0,
             0.5,
             disabled=prompt_length_mode != "Manual seconds",
-            help="Length of the generated prompt when Prompt length is set to Manual seconds.",
+            help=(
+                "Length of the generated prompt when Prompt length is set to Manual seconds."
+                if len(prompt_len_opts) > 1
+                else "Length of the generated prompt."
+            ) + _CAP_HELP_NOTE,
         )
         if prompt_length_mode == "Match drum MIDI" and matched_drum_seconds is not None:
             prompt_seconds = float(matched_drum_seconds)
@@ -1194,6 +1262,29 @@ with right:
             st.caption(f"Prompt length matched to bass MIDI: {prompt_seconds:.2f} sec")
         else:
             prompt_seconds = float(manual_prompt_seconds)
+
+        # Enforce the optional public-demo cap against the resolved prompt
+        # length for whichever length mode is selected — checked before any
+        # DSP runs, using the already-detected MIDI lengths. No truncation:
+        # the Generate button is disabled so an over-cap render can't start.
+        cap_exceeded = (
+            MAX_PROMPT_SECONDS is not None
+            and float(prompt_seconds) > float(MAX_PROMPT_SECONDS) + 1e-6
+        )
+        if cap_exceeded:
+            st.warning(
+                f"This prompt would be {prompt_seconds:.1f}s — the public demo caps "
+                f"prompts at {MAX_PROMPT_SECONDS:g}s (plenty for a 16-bar loop even at "
+                f"70 BPM). Trim your MIDI to {MAX_PROMPT_SECONDS:g}s or shorter, or run "
+                "the app yourself for unlimited length: "
+                "https://github.com/rwolt/audioprompt"
+            )
+        with gen_btn_slot:
+            pressed = st.button(
+                "Generate Prompt", type="primary", width="stretch", disabled=cap_exceeded
+            )
+        if pressed and cap_exceeded:
+            pressed = False  # belt-and-braces: never start an over-cap render
         st.markdown("**Prompt Level**")
         ag_col1, ag_col2 = st.columns([1,1])
         with ag_col1:
@@ -1416,6 +1507,8 @@ with right:
                         st.session_state["bass_bpm"] = round(float(target_bass_bpm), 1)
                         st.session_state["detected_bass_bpm"] = round(float(detected_bass_bpm), 1)
                         _log_debug(f"[gen] bass layer: len={len(y_bass)}, peak={np.max(np.abs(y_bass)):.4f}")
+                        # Free full-length intermediates; y_bass lives on in session_state
+                        del x_bass, bass_f0, bass_gate
                     except Exception as e:
                         _log_debug(f"[gen] bass error: {e}")
                         st.error(f"Failed to parse bass MIDI. Make sure you uploaded a valid .mid/.midi file.\nError: {e}")
@@ -1448,6 +1541,8 @@ with right:
                     ),
                     "bw_frac": bw_frac if enable_melody else None,
                 }
+                gc.collect()
+                _log_debug(f"[gen] done; mem={_mem_usage_mb()} MB")
 
         # Outputs header
         st.subheader("Outputs")
@@ -1643,6 +1738,22 @@ with right:
                         pass
                     gc.collect()
                     _log_debug(f"[combined] locals cleared; mem={_mem_usage_mb()} MB")
+            # Free per-render blend buffers: the encoded WAV bytes are cached in
+            # session_state, and y_prompt/y_drum/y_bass stay there for re-blending,
+            # so these full-length arrays are no longer needed this run.
+            try:
+                del y_render
+            except Exception:
+                pass
+            try:
+                del y_drum_local
+            except Exception:
+                pass
+            try:
+                del y_bass_local
+            except Exception:
+                pass
+            gc.collect()
         # Blue placeholders when outputs are not ready (pill style)
         if "y_prompt" not in st.session_state:
             st.markdown("<div class='spec-placeholder'>Set your parameters and press Generate Prompt.</div>", unsafe_allow_html=True)
@@ -1660,3 +1771,7 @@ st.markdown(
 # Inject drag-over highlight script at the end to avoid top spacer
 st.markdown("<div class='js-hook'></div>", unsafe_allow_html=True)
 components.html(_DRAG_JS, height=0)
+
+# Analytics only when the operator has configured an endpoint (see GOATCOUNTER_URL above)
+if GOATCOUNTER_URL:
+    components.html(_goatcounter_js(GOATCOUNTER_URL), height=0)

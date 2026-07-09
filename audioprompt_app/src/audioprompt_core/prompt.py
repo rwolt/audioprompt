@@ -76,6 +76,7 @@ def imprint_melody_focus(
     # Use Hann window with default boundary handling to satisfy NOLA/overlap-add conditions
     freqs, times, Z = stft(noise, fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)
     mag, ph = np.abs(Z), np.angle(Z)
+    del Z  # free the complex STFT matrix; only mag/ph are used from here on
 
     if focus is not None:
         if isinstance(focus, str):
@@ -126,7 +127,10 @@ def imprint_melody_focus(
         apply_formants(mag, freqs, times, vtraj, strength=float(formant_strength))
 
     # Inverse STFT with matching window and hop
-    _, y = istft(mag * np.exp(1j * ph), fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)
+    spec = mag * np.exp(1j * ph)
+    del mag, ph
+    _, y = istft(spec, fs=sr, window="hann", nperseg=n_fft, noverlap=n_fft - hop)
+    del spec
     y = y[: len(noise)]
     y /= np.max(np.abs(y) + 1e-12)
     return y.astype(np.float32)
