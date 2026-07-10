@@ -70,7 +70,7 @@ from audioprompt_core.drumnoise import (
 )
 
 
-st.set_page_config(page_title="AudioPrompt", layout="wide")
+st.set_page_config(page_title="AudioPrompt", page_icon="🎛️", layout="wide")
 
 # Optional render cap for public hosting. Unset/empty/invalid = no cap, so
 # local runs (and forks) behave exactly as before; the hosted demo sets e.g.
@@ -319,7 +319,9 @@ def _download_name(kind: str, base_stem: str | None, meta: dict) -> str:
 st.markdown(
     """
     <style>
-    .block-container{padding-top:1rem;padding-bottom:0.75rem; max-width:80vw; margin-left:auto; margin-right:auto;}
+    /* Enough top padding to clear Streamlit's fixed header — the language and
+       help-mode controls render first and must not be clipped by it. */
+    .block-container{padding-top:3.5rem;padding-bottom:0.75rem; max-width:80vw; margin-left:auto; margin-right:auto;}
     /* Keep Streamlit's primary theme color for the button; minimal tweaks only */
     div.stButton > button[kind="primary"] { padding: 0.9rem 1.25rem; font-size: 1.05rem; border-radius: 10px; }
     /* Prevent download labels from wrapping */
@@ -587,7 +589,7 @@ def build_prompt(
     return y_prompt, events
 
 
-st.title("AudioPrompt")
+st.title("🎛️ AudioPrompt")
 top_left, top_right = st.columns([1, 1], gap="large")
 with top_left:
     st.subheader("Quick Start")

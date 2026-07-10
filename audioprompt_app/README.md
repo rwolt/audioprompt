@@ -36,6 +36,7 @@ Then in the app:
 - **How it's built:** all UI strings live in [`ui_strings.py`](ui_strings.py) (English literal → translation, gettext-style with English fallback), and [`i18n.py`](i18n.py) wraps the Streamlit widgets so labels, tooltips, and option names translate without touching call sites. `tests/check_i18n_coverage.py` verifies every string in `app.py` has a translation entry.
 - **Adding a language:** add a table to `ui_strings.py` and register it in `TABLES` — the selector, URL param, and locale detection pick it up automatically. Translation corrections from native speakers are very welcome.
 - One known trade-off: switching language mid-session resets most controls to defaults (Streamlit widget identity is label-based). Pick your language first.
+- **Download filename tags stay in English in every language** — deliberately. They're compact parameter codes (`r-e_s-minpent_mb-96…`) meant for reproducibility and cross-platform-safe ASCII filenames, not prose.
 
 ## Configuration (environment variables)
 
