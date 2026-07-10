@@ -51,6 +51,21 @@ def test_help_as_text_mode():
     print(f"  a11y: captions {baseline} -> {n}")
 
 
+def test_both_midi_sections_in_help_text_mode():
+    """Regression: identically-labeled trim checkboxes in the drum and bass
+    sections collided (StreamlitDuplicateElementId) in help-as-text mode,
+    where stripping help= made their auto-generated widget IDs equal."""
+    at = _run(help_text=True)
+    cbs = {c.label: c for c in at.checkbox}
+    cbs["Enable drum MIDI imprint"].check()
+    cbs["Enable bass MIDI imprint"].check()
+    at.run()
+    assert not at.exception, f"duplicate-ID regression: {at.exception}"
+    trims = [c for c in at.checkbox if c.label == "Trim silence before first note"]
+    assert len(trims) == 2, "expected both trim checkboxes rendered"
+    print("  both MIDI sections + a11y: no widget ID collision")
+
+
 def test_japanese_help_as_text():
     at = _run(lang="ja", help_text=True)
     texts = [c.value for c in at.caption]

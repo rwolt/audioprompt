@@ -1010,6 +1010,10 @@ with left:
         drum_trim_silence = st.checkbox(
             "Trim silence before first note",
             value=True,
+            # Explicit key: the bass section has an identically labeled
+            # checkbox, and in help-as-text mode (help stripped from the
+            # widget) the auto-generated IDs would collide.
+            key="drum_trim_silence_cb",
             help=(
                 "Removes empty lead-in before the first drum hit "
                 "(e.g. Logic session-player exports add a phantom bar). "
@@ -1130,6 +1134,7 @@ with left:
         bass_trim_silence = st.checkbox(
             "Trim silence before first note",
             value=True,
+            key="bass_trim_silence_cb",  # see drum twin: avoids duplicate auto-ID
             help=(
                 "Removes empty lead-in before the first note "
                 "(e.g. Logic session-player exports add a phantom bar). "
