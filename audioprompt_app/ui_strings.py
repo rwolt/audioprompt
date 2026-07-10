@@ -315,7 +315,7 @@ BLOCKS: dict[str, dict[str, str]] = {
         "en": """
 AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It imprints a scale‑based melody, adds optional drum and bass layers from your MIDI files, emphasizes a frequency band, and can prepend the prompt to your input audio.
 
-1. (Optional) Drag‑drop input audio — the prompt will be **prepended** to it to create a combined WAV. Leave empty for a prompt-only WAV. A 1–2 bar drum loop works great as a starting point.
+1. (Optional) Drag‑drop input audio — the prompt will be **prepended** to it to create a combined WAV. Leave empty for a prompt-only WAV. An instrument sample (a short synth, guitar, or piano phrase) works great as a starting point.
 2. Choose Melody settings (root/scale/BPM). Optionally enable the Drum and Bass MIDI Imprint sections and upload .mid files to add rhythm and bassline layers.
 3. Use Focus (or Custom band) and keep Bass Roll-Off on for cleaner prompt starts.
 4. On the right, set Prompt length — match an uploaded MIDI or use manual seconds — then click Generate Prompt. Preview the Prompt (and Combined, if input audio was provided) and download the tagged WAVs.
@@ -325,7 +325,7 @@ Tips: 3–6 s prompts give a clear steer without masking; “Vocal” focus ofte
         "ja": """
 AudioPromptは、AI音楽モデルを誘導できる短いピンクノイズクリップ（オーディオプロンプト）を生成します。スケールに沿ったメロディをインプリントし、MIDIファイルからドラム・ベースレイヤーを追加し、特定の周波数帯域を強調し、入力オーディオの先頭にプロンプトを連結できます。
 
-1. （任意）入力オーディオをドラッグ＆ドロップ — プロンプトが**先頭に連結**され、結合WAVが作成されます。空のままならプロンプトのみのWAVになります。1〜2小節のドラムループが出発点として最適です。
+1. （任意）入力オーディオをドラッグ＆ドロップ — プロンプトが**先頭に連結**され、結合WAVが作成されます。空のままならプロンプトのみのWAVになります。楽器のサンプル（短いシンセ、ギター、ピアノのフレーズなど）が出発点として最適です。
 2. メロディ設定（ルート／スケール／BPM）を選びます。必要に応じてドラム・ベースMIDIインプリントを有効にし、.midファイルをアップロードしてリズムやベースラインのレイヤーを追加します。
 3. フォーカス（またはカスタム帯域）を使い、ベースロールオフをオンのままにするとプロンプトの立ち上がりがクリーンになります。
 4. 右側でプロンプト長を設定し（アップロードしたMIDIに合わせるか秒数を指定）、「プロンプトを生成」をクリック。プロンプト（入力オーディオがあれば結合版も）を試聴し、タグ付きWAVをダウンロードします。
