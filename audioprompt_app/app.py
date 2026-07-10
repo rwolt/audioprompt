@@ -94,11 +94,16 @@ MAX_PROMPT_SECONDS = _max_prompt_seconds()
 # at their own dashboard.
 GOATCOUNTER_URL = os.environ.get("GOATCOUNTER_URL", "").strip() or None
 
-_CAP_HELP_NOTE = (
-    f" Note: the public demo caps prompt length at {MAX_PROMPT_SECONDS:g} s."
-    if MAX_PROMPT_SECONDS is not None
-    else ""
-)
+# UI language + accessibility layer. Importing i18n wraps the common st.*
+# widgets so labels, tooltips, and option displays translate via the strings
+# table, and so tooltips can render as visible captions ("help as text" mode)
+# for screen readers. Rendered first so the controls are the first elements a
+# screen reader reaches.
+import i18n
+from i18n import t
+
+i18n.init()
+i18n.render_controls()
 
 # ------------------------------ Debug helpers ------------------------------ #
 def _mem_usage_mb() -> float | None:
@@ -345,11 +350,6 @@ st.markdown(
     .dl-row + div[data-testid="stHorizontalBlock"] .stButton button { width: auto; }
     /* Add horizontal padding to main two columns */
     /* Use Streamlit columns(gap=...) for spacing; no extra CSS gap/padding needed here. */
-    /* Seed: keep row height equal to button; overlay label via ::before on the widget container */
-    .st-key-seed { position: relative; }
-    .st-key-seed::before { content: 'Seed'; position: absolute; top: -18px; left: 2px; font-weight: 600; font-size: 0.85rem; line-height: 1; opacity: 0.9; }
-    .st-key-seed [data-testid="stNumberInputContainer"] { height: 56px; }
-    .st-key-seed input[data-testid="stNumberInputField"] { height: 56px; padding-top: 0; padding-bottom: 0; }
     .footer-note { font-size: 0.85rem; opacity: 0.75; margin: 0; }
     /* Hide the tiny iframe container used for JS injection at footer */
     .js-hook + div[data-testid="stElementContainer"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
@@ -380,6 +380,22 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# Seed label is painted via CSS ::before in the default (compact) layout.
+# In help-as-text mode the widget renders its real, screen-reader-visible
+# label instead, so the overlay is skipped to avoid a double label.
+if not i18n.help_as_text():
+    st.markdown(
+        f"""
+        <style>
+        .st-key-seed {{ position: relative; }}
+        .st-key-seed::before {{ content: '{t("Seed")}'; position: absolute; top: -18px; left: 2px; font-weight: 600; font-size: 0.85rem; line-height: 1; opacity: 0.9; }}
+        .st-key-seed [data-testid="stNumberInputContainer"] {{ height: 56px; }}
+        .st-key-seed input[data-testid="stNumberInputField"] {{ height: 56px; padding-top: 0; padding-bottom: 0; }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # JS helper: add/remove .dragging class on the file-uploader drop zone during drag events
 _DRAG_JS = """
@@ -575,18 +591,7 @@ st.title("AudioPrompt")
 top_left, top_right = st.columns([1, 1], gap="large")
 with top_left:
     st.subheader("Quick Start")
-    st.markdown(
-        """
-        AudioPrompt creates a short, steerable pink‑noise clip that can guide AI music models. It imprints a scale‑based melody, adds optional drum and bass layers from your MIDI files, emphasizes a frequency band, and can prepend the prompt to your input audio.
-
-        1. (Optional) Drag‑drop input audio — the prompt will be **prepended** to it to create a combined WAV. Leave empty for a prompt-only WAV. A 1–2 bar drum loop works great as a starting point.
-        2. Choose Melody settings (root/scale/BPM). Optionally enable the Drum and Bass MIDI Imprint sections and upload .mid files to add rhythm and bassline layers.
-        3. Use Focus (or Custom band) and keep Bass Roll-Off on for cleaner prompt starts.
-        4. On the right, set Prompt length — match an uploaded MIDI or use manual seconds — then click Generate Prompt. Preview the Prompt (and Combined, if input audio was provided) and download the tagged WAVs.
-
-        Tips: 3–6 s prompts give a clear steer without masking; “Vocal” focus often helps melody “speak”.
-        """
-    )
+    st.markdown(i18n.block("quick_start"))
 with top_right:
     st.subheader("Input Audio")
     uploaded = st.file_uploader(
@@ -859,13 +864,14 @@ with left:
             key="drum_midi_file",
         )
         if drum_midi_file is not None:
-            st.caption(f"Uploaded: {drum_midi_file.name}")
+            st.caption(t("Uploaded: {name}", name=drum_midi_file.name))
             drum_timing_preview = _inspect_uploaded_drum_midi(drum_midi_file)
             if drum_timing_preview is not None:
-                st.caption(
-                    f"Detected drum MIDI: {drum_timing_preview['bpm']:g} BPM, "
-                    f"{drum_timing_preview['length_s']:.2f} sec"
-                )
+                st.caption(t(
+                    "Detected drum MIDI: {bpm} BPM, {length} sec",
+                    bpm=f"{drum_timing_preview['bpm']:g}",
+                    length=f"{drum_timing_preview['length_s']:.2f}",
+                ))
         else:
             st.session_state.pop("y_drum", None)
             st.session_state.pop("drum_bpm", None)
@@ -982,7 +988,10 @@ with left:
         target_drum_bpm_preview = float(bpm) if match_melody_bpm else float(drum_bpm)
         matched_drum_seconds = _matched_drum_length_seconds(drum_timing_preview, target_drum_bpm_preview)
         if matched_drum_seconds is not None:
-            st.caption(f"Matched drum length: {matched_drum_seconds:.2f} sec at {target_drum_bpm_preview:g} BPM")
+            st.caption(t(
+                "Matched drum length: {length} sec at {bpm} BPM",
+                length=f"{matched_drum_seconds:.2f}", bpm=f"{target_drum_bpm_preview:g}",
+            ))
         loop_drums = st.checkbox(
             "Loop drums to prompt length",
             value=True,
@@ -1025,13 +1034,14 @@ with left:
             key="bass_midi_file",
         )
         if bass_midi_file is not None:
-            st.caption(f"Uploaded: {bass_midi_file.name}")
+            st.caption(t("Uploaded: {name}", name=bass_midi_file.name))
             bass_timing_preview = _inspect_uploaded_bass_midi(bass_midi_file)
             if bass_timing_preview is not None:
-                st.caption(
-                    f"Detected bass MIDI: {bass_timing_preview['bpm']:g} BPM, "
-                    f"{bass_timing_preview['length_s']:.2f} sec"
-                )
+                st.caption(t(
+                    "Detected bass MIDI: {bpm} BPM, {length} sec",
+                    bpm=f"{bass_timing_preview['bpm']:g}",
+                    length=f"{bass_timing_preview['length_s']:.2f}",
+                ))
         else:
             st.session_state.pop("y_bass", None)
             st.session_state.pop("bass_timing_preview", None)
@@ -1100,7 +1110,10 @@ with left:
         target_bass_bpm_preview = float(bpm) if match_melody_bpm_bass else float(bass_bpm)
         matched_bass_seconds = _matched_drum_length_seconds(bass_timing_preview, target_bass_bpm_preview)
         if matched_bass_seconds is not None:
-            st.caption(f"Matched bass length: {matched_bass_seconds:.2f} sec at {target_bass_bpm_preview:g} BPM")
+            st.caption(t(
+                "Matched bass length: {length} sec at {bpm} BPM",
+                length=f"{matched_bass_seconds:.2f}", bpm=f"{target_bass_bpm_preview:g}",
+            ))
             
         loop_bass = st.checkbox(
             "Loop bass to prompt length",
@@ -1253,7 +1266,9 @@ with right:
                 max_value=10_000_000,
                 value=-1,
                 step=1,
-                label_visibility="collapsed",
+                # Compact layout paints the label via CSS; help-as-text mode
+                # shows the real label so screen readers get an accessible name.
+                label_visibility="visible" if i18n.help_as_text() else "collapsed",
                 help="Controls randomness for pink noise and the melody (notes, glides, etc.). Set to -1 to use a new random seed each generation.",
                 key="seed",
             )
@@ -1271,17 +1286,22 @@ with right:
         if can_match_bass_length:
             prompt_len_opts.insert(0, "Match bass MIDI")
             
+        _cap_note = (
+            t(" Note: the public demo caps prompt length at {cap} s.", cap=f"{MAX_PROMPT_SECONDS:g}")
+            if MAX_PROMPT_SECONDS is not None
+            else ""
+        )
         if len(prompt_len_opts) > 1:
             prompt_length_mode = st.radio(
                 "Prompt length",
                 options=prompt_len_opts,
                 index=0,
                 horizontal=True,
-                help="Match length to uploaded MIDI regions (adjusted to target BPM) or use manual seconds." + _CAP_HELP_NOTE,
+                help=t("Match length to uploaded MIDI regions (adjusted to target BPM) or use manual seconds.") + _cap_note,
             )
         else:
             prompt_length_mode = "Manual seconds"
-            
+
         manual_prompt_seconds = st.slider(
             "Manual seconds" if len(prompt_len_opts) > 1 else "Prompt seconds",
             1.0,
@@ -1289,18 +1309,18 @@ with right:
             4.0,
             0.5,
             disabled=prompt_length_mode != "Manual seconds",
-            help=(
+            help=t(
                 "Length of the generated prompt when Prompt length is set to Manual seconds."
                 if len(prompt_len_opts) > 1
                 else "Length of the generated prompt."
-            ) + _CAP_HELP_NOTE,
+            ) + _cap_note,
         )
         if prompt_length_mode == "Match drum MIDI" and matched_drum_seconds is not None:
             prompt_seconds = float(matched_drum_seconds)
-            st.caption(f"Prompt length matched to drum MIDI: {prompt_seconds:.2f} sec")
+            st.caption(t("Prompt length matched to drum MIDI: {length} sec", length=f"{prompt_seconds:.2f}"))
         elif prompt_length_mode == "Match bass MIDI" and matched_bass_seconds is not None:
             prompt_seconds = float(matched_bass_seconds)
-            st.caption(f"Prompt length matched to bass MIDI: {prompt_seconds:.2f} sec")
+            st.caption(t("Prompt length matched to bass MIDI: {length} sec", length=f"{prompt_seconds:.2f}"))
         else:
             prompt_seconds = float(manual_prompt_seconds)
 
@@ -1313,20 +1333,20 @@ with right:
             and float(prompt_seconds) > float(MAX_PROMPT_SECONDS) + 1e-6
         )
         if cap_exceeded:
-            st.warning(
-                f"This prompt would be {prompt_seconds:.1f}s — the public demo caps "
-                f"prompts at {MAX_PROMPT_SECONDS:g}s (plenty for a 16-bar loop even at "
-                f"70 BPM). Trim your MIDI to {MAX_PROMPT_SECONDS:g}s or shorter, or run "
-                "the app yourself for unlimited length: "
-                "https://github.com/rwolt/audioprompt"
-            )
+            st.warning(t(
+                "This prompt would be {length}s — the public demo caps prompts at "
+                "{cap}s (plenty for a 16-bar loop even at 70 BPM). Trim your MIDI to "
+                "{cap}s or shorter, or run the app yourself for unlimited length: "
+                "https://github.com/rwolt/audioprompt",
+                length=f"{prompt_seconds:.1f}", cap=f"{MAX_PROMPT_SECONDS:g}",
+            ))
         with gen_btn_slot:
             pressed = st.button(
                 "Generate Prompt", type="primary", width="stretch", disabled=cap_exceeded
             )
         if pressed and cap_exceeded:
             pressed = False  # belt-and-braces: never start an over-cap render
-        st.markdown("**Prompt Level**")
+        st.markdown(t("**Prompt Level**"))
         ag_col1, ag_col2 = st.columns([1,1])
         with ag_col1:
             auto_gain = st.checkbox(
@@ -1356,7 +1376,7 @@ with right:
             fade_out_ms = st.slider("Fade-out (ms)", 0, 500, 50, 1, help="Smooth ramp at the end.")
 
         # Blend controls — always visible so the user can tune the mix
-        st.markdown("**Layer Blend**")
+        st.markdown(t("**Layer Blend**"))
         bl1, bl2, bl3 = st.columns(3, gap="small")
         with bl1:
             melody_blend_gain = st.slider(
@@ -1452,7 +1472,7 @@ with right:
                         _log_debug(f"[gen] drum layer: len={len(y_drum)}, peak={np.max(np.abs(y_drum)):.4f}")
                     except Exception as e:
                         _log_debug(f"[gen] drum error: {e}")
-                        st.error(f"Failed to parse drum MIDI. Make sure you uploaded a valid .mid/.midi file.\nError: {e}")
+                        st.error(t("Failed to parse drum MIDI. Make sure you uploaded a valid .mid/.midi file.\nError: {err}", err=e))
                         st.session_state.pop("y_drum", None)
                         drum_seed_used = None
                 else:
@@ -1552,7 +1572,7 @@ with right:
                         del x_bass, bass_f0, bass_gate
                     except Exception as e:
                         _log_debug(f"[gen] bass error: {e}")
-                        st.error(f"Failed to parse bass MIDI. Make sure you uploaded a valid .mid/.midi file.\nError: {e}")
+                        st.error(t("Failed to parse bass MIDI. Make sure you uploaded a valid .mid/.midi file.\nError: {err}", err=e))
                         st.session_state.pop("y_bass", None)
                         bass_seed_used = None
                 else:
@@ -1584,6 +1604,8 @@ with right:
                 }
                 gc.collect()
                 _log_debug(f"[gen] done; mem={_mem_usage_mb()} MB")
+            # Text status so completion is announced to screen readers too
+            st.success(t("Prompt generated — {length} sec", length=f"{prompt_seconds:.2f}"))
 
         # Outputs header
         st.subheader("Outputs")
@@ -1646,22 +1668,24 @@ with right:
 
             # Prompt audio + download (render below in this column)
             # Reuse cached prompt bytes if parameters unchanged
-            st.caption(f"Seed used: {seed_val_local}")
+            st.caption(t("Seed used: {seed}", seed=seed_val_local))
             if "y_drum" in st.session_state:
                 drum_bpm_display = st.session_state.get("drum_bpm", "—")
                 detected_bpm_display = st.session_state.get("detected_drum_bpm")
                 if detected_bpm_display is not None:
-                    st.caption(f"Drum layer: {drum_bpm_display} BPM (detected {detected_bpm_display} BPM)")
+                    st.caption(t("Drum layer: {bpm} BPM (detected {detected} BPM)",
+                                 bpm=drum_bpm_display, detected=detected_bpm_display))
                 else:
-                    st.caption(f"Drum layer: {drum_bpm_display} BPM")
+                    st.caption(t("Drum layer: {bpm} BPM", bpm=drum_bpm_display))
             if "y_bass" in st.session_state:
                 bass_bpm_display = st.session_state.get("bass_bpm", "—")
                 detected_bass_bpm_display = st.session_state.get("detected_bass_bpm")
                 if detected_bass_bpm_display is not None:
-                    st.caption(f"Bass layer: {bass_bpm_display} BPM (detected {detected_bass_bpm_display} BPM)")
+                    st.caption(t("Bass layer: {bpm} BPM (detected {detected} BPM)",
+                                 bpm=bass_bpm_display, detected=detected_bass_bpm_display))
                 else:
-                    st.caption(f"Bass layer: {bass_bpm_display} BPM")
-            st.markdown("**Prompt**")
+                    st.caption(t("Bass layer: {bpm} BPM", bpm=bass_bpm_display))
+            st.markdown(t("**Prompt**"))
             prompt_key_now = (
                 "prompt",
                 int(sr_prompt_local),
@@ -1704,11 +1728,11 @@ with right:
                 try:
                     x_local, sr_in_local = load_audio_mono(uploaded, int(sr))
                 except Exception as e:
-                    st.error(
+                    st.error(t(
                         "Failed to read input audio. Prefer WAV/FLAC/OGG. "
                         "MP3 support depends on your libsndfile build.\n"
-                        f"Error: {e}"
-                    )
+                        "Error: {err}", err=e,
+                    ))
                     x_local = None
                 if x_local is not None:
                     target_len_local = int(round(float(prompt_seconds) * int(sr)))
@@ -1758,7 +1782,7 @@ with right:
                     else:
                         combined_wav_local = st.session_state["combined_bytes"]
                         _log_debug(f"[combined] reused cache; mem={_mem_usage_mb()} MB")
-                    st.markdown("**Combined**")
+                    st.markdown(t("**Combined**"))
                     st.markdown("<div class='dl-row'>", unsafe_allow_html=True)
                     cap_col_audio, cap_col_btn = st.columns([4,1], gap="small")
                     with cap_col_audio:
@@ -1797,15 +1821,15 @@ with right:
             gc.collect()
         # Blue placeholders when outputs are not ready (pill style)
         if "y_prompt" not in st.session_state:
-            st.markdown("<div class='spec-placeholder'>Set your parameters and press Generate Prompt.</div>", unsafe_allow_html=True)
-            st.markdown("<div class='spec-placeholder'>No input file uploaded; only the prompt is generated.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='spec-placeholder'>{t('Set your parameters and press Generate Prompt.')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='spec-placeholder'>{t('No input file uploaded; only the prompt is generated.')}</div>", unsafe_allow_html=True)
         elif uploaded is None:
-            st.markdown("<div class='spec-placeholder'>No input file uploaded; only the prompt is generated.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='spec-placeholder'>{t('No input file uploaded; only the prompt is generated.')}</div>", unsafe_allow_html=True)
 
 # Footer: brief Terms & Privacy notice (public hosting)
 st.markdown("---")
 st.markdown(
-    "<div class='footer-note'>Terms: Upload only content you own or have rights to. By using this app you confirm permission to process any uploaded audio.</div>",
+    f"<div class='footer-note'>{i18n.block('footer_terms')}</div>",
     unsafe_allow_html=True,
 )
 

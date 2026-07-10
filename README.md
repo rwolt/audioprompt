@@ -1,54 +1,26 @@
-# AudioPrompt — Streamlit App and CLI
+# AudioPrompt
 
-Create short, steerable “audio prompts” to nudge AI music tools. AudioPrompt can imprint a scale‑constrained melody onto pink noise, emphasize vocal/guitar/bass bands, and prepend the prompt to your track for upload.
+**[日本語版 README はこちら → README.ja.md](README.ja.md)**
 
-Demo: [https://audioprompt.streamlit.app/](https://audioprompt.streamlit.app/)
----
+Create short, steerable "audio prompts" to nudge AI music tools. AudioPrompt imprints a scale-constrained melody onto pink noise, adds optional drum and bass layers from your MIDI files, emphasizes vocal/guitar/bass frequency bands, and can prepend the prompt to your track for upload.
+
+**Live demo:** [https://audioprompt.streamlit.app/](https://audioprompt.streamlit.app/)
+
+📖 **Full app manual** (every control, the MIDI drum map, how the DSP works): [`audioprompt_app/README.md`](audioprompt_app/README.md)
 
 ## ✨ Features
-- 🧠 Scale‑driven melody imprint (randomized, in‑key, with vibrato/glides)
-- 🎛️ Lightweight character controls for melody tone and note shape
-- 🎚️ Spectral focus (vocal/guitar/bass presets or custom Hz band)
-- 🥁 Rhythmic gate from note events (phrase‑like envelope)
-- 🥁 **Drum MIDI Imprint** — upload a General MIDI drum track to generate a rhythmic noise layer (velocity‑sensitive kick/snare/hat/perc lanes with tone, tune, decay, and blend controls)
-- 🎸 **Bass MIDI Imprint** — upload a MIDI bass track with pitch bend and velocity to generate a continuous bass layer using the same STFT engine as melody (legato slides, BPM scaling, loop, and trim-leading-silence support)
-- 🔊 **Root drone** — optional sustained sine+triangle wave two octaves below the root, mixed under the melody for harmonic grounding
-- 🗣️ **Vowel character** — optional English vowel formant imprint (F1/F2/F3 trajectories) applied per STFT frame, with stress-pattern and strength controls
-- 📎 Drag‑and‑drop input; tagged downloads (scale/focus/drum/bass/vowel/seed)
-- 🧰 Pure Python DSP (NumPy/SciPy/soundfile)
 
----
+- 🧠 Scale-driven melody imprint — randomized, in-key, with vibrato/glides and tone presets
+- 🥁 **Drum MIDI Imprint** — upload a General MIDI drum track for a velocity-sensitive rhythmic noise layer
+- 🎸 **Bass MIDI Imprint** — upload a bass MIDI track with pitch bend and velocity for a continuous bass layer
+- 🎚️ Spectral focus (vocal/guitar/bass presets or custom Hz band) and rhythmic gating
+- 🗣️ **Vowel imprint** — optional sung-vowel formant shaping with English, Japanese, and Spanish presets
+- 🌏 **UI in English and 日本語** — auto-detected from your browser, switchable anytime
+- ♿ **Help as visible text** — accessibility mode that shows every explanation as readable text instead of hover tooltips
+- 📎 Drag-and-drop input; tagged WAV downloads; pure Python DSP (NumPy/SciPy/soundfile)
 
-## 📦 What’s Included
-- Streamlit App (local or Streamlit Community Cloud)
-- Minimal CLI for analysis/prompt/prepend
+## 🚀 Run the app
 
-Supported formats
-- Input: WAV/FLAC/OGG/AIFF via libsndfile; MP3 is supported if your libsndfile build includes MP3 (mpg123). If MP3 fails to load, convert to WAV/FLAC/OGG.
-- Output: WAV
-
-Requirements
-- Python 3.9+
-- Install deps in a virtual environment (recommended):
-
-```bash
-python -m venv .venv
-source .venv/bin/activate    # Windows: .venv\Scripts\activate
-python -m pip install -r requirements.txt
-```
-
-Conda alternative
-```bash
-conda create -n audioprompt python=3.11 -y
-conda activate audioprompt
-python -m pip install -r requirements.txt
-```
-
----
-
-## 🚀 Streamlit App (recommended)
-
-Run locally
 ```bash
 cd audioprompt_app
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
@@ -56,116 +28,43 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Conda alternative
-```bash
-cd audioprompt_app
-conda create -n audioprompt-app python=3.11 -y
-conda activate audioprompt-app
-pip install -r requirements.txt
-streamlit run app.py
-```
+Then: drop in audio (optional), set melody/drum/bass layers, press **Generate Prompt**, and download the tagged WAVs. 3–6 second prompts steer clearly without masking. See the [full manual](audioprompt_app/README.md) for every control.
 
-Deploy to Streamlit Community Cloud
-```text
-1) Push this repo to GitHub
-2) Create a new Streamlit app and point it to audioprompt_app/app.py
-3) It installs audioprompt_app/requirements.txt and runs automatically
-```
+## 🌏 Languages & accessibility
 
-Quick start (in the app)
-- Drag‑drop input audio to create a combined output, or leave empty to generate a prompt only
-- Set Prompt seconds or match prompt length to uploaded drum MIDI, then choose Melody settings (root/scale/BPM/range)
-- Use Focus (vocal/guitar/bass/custom Hz band) and enable Bass Roll-Off if needed
-- Press “Generate Prompt” → preview Prompt and (if provided) Combined → download tagged WAVs
-
-Tips
-- 3–6 s prompts give a clear steer without masking
-- Use WAV/FLAC inputs for best reliability; MP3 works when libsndfile has MP3 enabled
-
----
+- The UI is available in **English** and **日本語**. The app detects your browser language on first visit; switch anytime with the selector at the top, or link directly with `?lang=ja` / `?lang=en`.
+- **Show help as visible text** (top of the page, or `?help=text`) renders every control's explanation as plain text under the control instead of hover tooltips — recommended for screen readers, and it also makes all explanations translatable.
+- Translations were machine-drafted and reviewed for natural audio-production terminology — **corrections from native speakers are very welcome** (all strings live in [`audioprompt_app/ui_strings.py`](audioprompt_app/ui_strings.py)).
 
 ## 🧪 CLI (headless)
 
-Usage
-```text
-python audioprompt.py analyze <in.wav> [--bands N] [--bins M] [--outdir DIR] [--print-eq]
+A minimal CLI for analysis/prompt/prepend lives at the repo root:
+
+```bash
+python audioprompt.py analyze <in.wav> [--bands N] [--bins M] [--print-eq]
 python audioprompt.py prompt  <in.wav> <out.wav> [--duration S] [--max-gain dB]
 python audioprompt.py prepend <prompt.wav> <seed.wav> <out.wav>
-
-Options
-  analyze:
-    --bands N      Number of log-spaced bands for the profile (default: 1024)
-    --bins M       Downsampled bands for convenience/preview (default: 24)
-    --outdir DIR   Directory for profile outputs (default: .)
-    --print-eq     Print firequalizer-style entries to stdout
-
-  prompt:
-    --duration S   Prompt length in seconds (default: 6.0)
-    --max-gain dB  Max inverse-EQ boost (default: 6.0 dB)
 ```
 
-Examples
-```bash
-# Analyze and print firequalizer entries
-python audioprompt.py analyze input.wav --print-eq
+## 📁 Project layout
 
-# Generate an 8 s prompt with stronger shaping
-python audioprompt.py prompt input.wav prompt.wav --duration 8 --max-gain 8
+- `audioprompt_app/` — the Streamlit app ([manual](audioprompt_app/README.md))
+- `audioprompt_app/src/audioprompt_core/` — DSP core (pink noise, STFT imprint, MIDI parsing, formants)
+- `audioprompt.py` — CLI
 
-# Prepend prompt to seed for upload
-python audioprompt.py prepend prompt.wav input.wav upload.wav
-```
+## 🛡️ Legal & content use
 
----
-
-## 📁 Project Layout
-- `audioprompt_app/` — Streamlit app (two‑column UI, dark theme, drag‑drop upload)
-- `audioprompt_app/src/audioprompt_core/` — shared core:
-  - `audio.py`, `melody.py`, `prompt.py` — pink noise, melody generation, STFT imprint
-  - `mididrums.py`, `drumnoise.py` — drum MIDI parsing and lane synthesis
-  - `midibass.py` — bass MIDI parsing with pitch bend, legato slides, BPM scaling
-  - `formants.py` — English vowel formant tables, per-frame F1/F2/F3 trajectory, STFT application
-- `audioprompt.py` — CLI (analyze/prompt/prepend)
-- `requirements.txt` — minimal dependencies for the CLI/analysis tools
-
----
-
-## 🧬 How It Works
-- Pink noise base: builds 1/√f spectrum in the frequency domain and inverse‑FFTs to time domain; normalizes to headroom.
-- Random melody (optional):
-  - Picks scale notes (root + mode) within a MIDI range; durations from BPM‑scaled choices.
-  - Step/leap behavior, rests, and seed‑driven randomness; converts notes to an f0 trajectory.
-  - Expression: optional glides between notes and subtle vibrato; light smoothing to reduce discontinuities.
-  - Character controls adjust harmonic balance and note envelope using simple musician-facing presets.
-- Spectral imprint:
-  - STFT on the pink noise; per frame, builds a harmonic mask centered at the current f0 (and harmonics) with bandwidth proportional to frequency.
-  - Multiplies the STFT magnitude by this mask to emphasize harmonic structure; preserves phase; ISTFT back to time domain; re‑normalize.
-- Focus band (optional): applies a global soft band‑pass mask in log‑frequency (preset or custom low/high Hz), with outside‑band floor.
-- Rhythmic gate (optional): constructs an amplitude envelope from event onsets/offsets (attack/release), and applies it to the prompt.
-- Drum MIDI Imprint (optional): parses a General MIDI drum track, maps common drum notes to kick/snare/hat/perc noise lanes, generates band-limited pink noise per lane, and applies velocity-sensitive AD envelopes. Drum character presets shift lane frequency bands, decay, and light drive; snare tune shifts the snare lane by semitones before synthesis. Drum BPM can match Melody BPM or independently time-scale the MIDI, prompt length can match the MIDI region, and optional looping repeats short grooves to fill the prompt.
-- Bass MIDI Imprint (optional): parses a MIDI bass track with pitch bend and note velocity, builds a continuous f0 trajectory with legato portamento and bend curves, then imprints it onto pink noise using the same STFT harmonic mask engine as melody. A velocity-sensitive rhythmic gate is applied on top. BPM scaling, looping, and leading-silence trimming (for DAW phantom-bar exports) are all supported.
-- Root drone (optional): adds a sine+triangle wave two octaves below the root, mixed under the melody at a user-controlled level for harmonic grounding.
-- Vowel character (optional): assigns English vowels to melody events using a stress-timed pattern (accented notes get full vowels; weak beats reduce to schwa), resolves per-frame F1/F2/F3 trajectories with short glides, and multiplies a sum-of-Lorentzian-resonances envelope into the STFT magnitude alongside the focus band. Strength control blends from no effect to full character.
-- Prepend path: resamples the prompt if needed, trims to the resolved prompt length, applies gain and fades, concatenates with the input, and trims peaks (≤ −1 dBFS).
-- Tagged filenames: use compact tags for root, scale, melody BPM, melody/noise seed, drum BPM, drum seed, and optional focus/character/vowel settings.
-- Determinism: fixed `seed` yields repeatable results; `-1` chooses a new random seed at each generation (Streamlit app).
-
----
-
-## 🛡️ Legal & Content Use
 - Upload only content you have the rights and permissions to use.
 - By using the app, you confirm you have permission to process any uploaded audio.
-- This project is provided “as is” without warranties; see the MIT license for details.
+- This project is provided "as is" without warranties; see the MIT license.
 
----
+## 📄 Terms & privacy
 
-## 📄 Terms & Privacy
 - You retain all rights to your audio. You grant permission to process your uploaded file(s) for the purpose of generating prompts.
-- Do not upload third‑party copyrighted material without authorization.
+- Do not upload third-party copyrighted material without authorization.
 - This app does not store uploaded audio or user data. By default the app collects no analytics at all — if you run it yourself (locally or self-hosted), nothing is tracked and nothing phones home unless you set the optional `GOATCOUNTER_URL` environment variable to point at your own analytics endpoint.
 - The public demo sets `GOATCOUNTER_URL` and uses [GoatCounter](https://www.goatcounter.com/) for privacy-friendly aggregate analytics: page views and referrers only. No cookies, no personal data, and no individual or cross-site tracking.
 
----
-
 ## 📜 License
+
 MIT License — see `LICENSE`.

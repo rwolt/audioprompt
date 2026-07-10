@@ -1,4 +1,6 @@
-# AudioPrompt (Streamlit)
+# AudioPrompt (Streamlit) — App Manual
+
+> This is the **technical manual** for the Streamlit app: every control, the MIDI drum map, configuration, and how the DSP works. For the project overview and quick start, see the [root README](../README.md) ([日本語](../README.ja.md)).
 
 A two-column Streamlit app for generating **audio prompts** that steer AI music models: pink noise optionally imprinted with a randomized scale-constrained melody, optional spectral focus (bass/guitar/vocal/custom Hz band), rhythmic gating, a **Drum MIDI Imprint** layer, and a **Bass MIDI Imprint** layer with pitch-bend and velocity support.
 
@@ -26,6 +28,14 @@ Then in the app:
 
 - **Input:** WAV / FLAC / OGG / AIFF via libsndfile. (MP3/M4A are not guaranteed; convert to WAV for best reliability.)
 - **Output:** WAV (PCM16).
+
+## Language & accessibility
+
+- **UI languages:** English and 日本語. The app defaults to your browser's language on first visit (via `st.context.locale`) and can be switched anytime with the **Language / 言語** selector at the top of the page. The choice persists in the URL — `?lang=ja` / `?lang=en` make shareable language-specific links.
+- **Show help as visible text** (checkbox at the top, or `?help=text`): renders every control's explanation as plain text under the control instead of a hover tooltip. Streamlit tooltips are hover-only and not exposed to screen readers or browser translation, so this mode is the accessible and fully-translatable alternative. It also gives the Seed field a real visible label.
+- **How it's built:** all UI strings live in [`ui_strings.py`](ui_strings.py) (English literal → translation, gettext-style with English fallback), and [`i18n.py`](i18n.py) wraps the Streamlit widgets so labels, tooltips, and option names translate without touching call sites. `tests/check_i18n_coverage.py` verifies every string in `app.py` has a translation entry.
+- **Adding a language:** add a table to `ui_strings.py` and register it in `TABLES` — the selector, URL param, and locale detection pick it up automatically. Translation corrections from native speakers are very welcome.
+- One known trade-off: switching language mid-session resets most controls to defaults (Streamlit widget identity is label-based). Pick your language first.
 
 ## Configuration (environment variables)
 
