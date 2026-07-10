@@ -321,7 +321,7 @@ st.markdown(
     <style>
     /* Enough top padding to clear Streamlit's fixed header — the language and
        help-mode controls render first and must not be clipped by it. */
-    .block-container{padding-top:3.5rem;padding-bottom:0.75rem; max-width:80vw; margin-left:auto; margin-right:auto;}
+    .block-container{padding-top:4.25rem;padding-bottom:0.75rem; max-width:80vw; margin-left:auto; margin-right:auto;}
     /* Keep Streamlit's primary theme color for the button; minimal tweaks only */
     div.stButton > button[kind="primary"] { padding: 0.9rem 1.25rem; font-size: 1.05rem; border-radius: 10px; }
     /* Prevent download labels from wrapping */
