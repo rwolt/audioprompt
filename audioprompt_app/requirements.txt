@@ -1,4 +1,7 @@
-streamlit>=1.34
+# Pinned to the locally tested version: the app relies on st.context.locale
+# (1.40+) and widget-ID behavior the i18n layer depends on, so deploys must
+# not drift ahead of what's been tested.
+streamlit==1.57.0
 numpy>=1.24
 scipy>=1.10
 soundfile>=0.12
