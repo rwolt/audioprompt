@@ -1844,6 +1844,10 @@ st.markdown(
     f"<div class='footer-note'>{i18n.block('footer_terms')}</div>",
     unsafe_allow_html=True,
 )
+st.markdown(
+    f"<div class='footer-note'>{i18n.block('footer_links')}</div>",
+    unsafe_allow_html=True,
+)
 
 # Inject drag-over highlight script at the end to avoid top spacer
 st.markdown("<div class='js-hook'></div>", unsafe_allow_html=True)

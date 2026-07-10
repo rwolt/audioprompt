@@ -339,4 +339,19 @@ AudioPromptは、AI音楽モデルを誘導できる短いピンクノイズク�
         "en": "Terms: Upload only content you own or have rights to. By using this app you confirm permission to process any uploaded audio.",
         "ja": "利用規約: ご自身が権利を有するコンテンツのみアップロードしてください。本アプリの利用により、アップロードした音声を処理する許可があることを確認したものとみなされます。",
     },
+    "footer_links": {
+        "en": (
+            'AudioPrompt is open source: '
+            '<a href="https://github.com/rwolt/audioprompt" target="_blank" rel="noopener">GitHub repository</a> · '
+            '<a href="https://github.com/rwolt/audioprompt/blob/main/audioprompt_app/README.md" target="_blank" rel="noopener">app manual</a>'
+            ' — bug reports and translation fixes welcome.'
+        ),
+        "ja": (
+            'AudioPromptはオープンソースです: '
+            '<a href="https://github.com/rwolt/audioprompt" target="_blank" rel="noopener">GitHubリポジトリ</a>'
+            '（<a href="https://github.com/rwolt/audioprompt/blob/main/README.ja.md" target="_blank" rel="noopener">日本語README</a>）・'
+            '<a href="https://github.com/rwolt/audioprompt/blob/main/audioprompt_app/README.md" target="_blank" rel="noopener">アプリマニュアル（英語）</a>'
+            ' — 不具合報告や訳文の改善提案を歓迎します。'
+        ),
+    },
 }
