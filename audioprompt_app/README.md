@@ -52,7 +52,7 @@ Both are optional. With neither set, the app runs fully unrestricted and collect
 - **Melody character:** harmonic color preset — neutral, warm, voice, reed, bell, pluck, bright, or wide (7-cent detune spread).
 - **Note shape / Note decay:** envelope feel for imprinted notes; lower decay = staccato.
 - **Advanced:** MIDI range (low/high), step bias vs. leaps, rest probability, glides, vibrato, root drone level, imprint gain, harmonics, **BW frac** (the primary texture control — narrow = tight pitch instruction, wide = diffuse), and **noise floor (dB)** to attenuate non-harmonic static.
-- **Vowel character (expander):** off by default (vowel-neutral buzz gives the AI freedom). On = pushes toward English-style sung diction, with strength and stress-pattern controls.
+- **Vowel character (expander):** off by default (vowel-neutral buzz gives the AI freedom). On = biases the output toward voice-like vowel color in a chosen language — English, Japanese, or Spanish. See [Vowel imprint & languages](#vowel-imprint--languages) for what this does and doesn't do.
 
 **Drum MIDI Imprint** (when enabled)
 
@@ -94,7 +94,7 @@ Output names encode the key generation settings:
 - Prompt only: `ap_prompt_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav`
 - Combined: `my-song-take-1_combined_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav`
 
-Tags: `r` = root, `s` = scale, `mb` = melody BPM, `ms` = melody/noise seed, `db` = drum BPM, `ds` = drum seed, `len` = length. Focus appears only when enabled (`f-voc`, `f-b120-3200`); character only when non-neutral (`ch-voice`); vowel character when enabled (`vow-EN-s60-a2` = strength 60%, accent period 2); `bw-N` when BW frac differs from the 0.01 default.
+Tags: `r` = root, `s` = scale, `mb` = melody BPM, `ms` = melody/noise seed, `db` = drum BPM, `ds` = drum seed, `len` = length. Focus appears only when enabled (`f-voc`, `f-b120-3200`); character only when non-neutral (`ch-voice`); vowel imprint when enabled (`vow-EN-s60-a2` = English, strength 60%, accent period 2; `vow-JA-s60` / `vow-ES-s60` for Japanese/Spanish, which have no accent period); `bw-N` when BW frac differs from the 0.01 default.
 
 ## MIDI drum map (General MIDI → lanes)
 
@@ -124,7 +124,29 @@ Notes:
 - **Rhythmic gate:** time-domain velocity-sensitive envelope matched to note onsets/offsets.
 - **Drum MIDI Imprint:** maps MIDI events to lanes, generates band-limited pink noise per lane with velocity-sensitive AD envelopes (velocity controls both loudness and decay), then applies tone/tune/decay presets. Drum BPM is a *target tempo* — event times are scaled, not pitch-shifted.
 - **Bass MIDI Imprint:** parses notes with pitch bend into a continuous f0 trajectory (legato slides and bend curves included) and imprints it via the same STFT mask engine as the melody.
-- **Vowel character (optional):** accented notes get a full English vowel, weak beats reduce to schwa — the acoustic signature of stress-timed English — resolved into a per-frame F1/F2/F3 formant envelope multiplied into the STFT magnitude. When off, output is unchanged.
+- **Vowel imprint (optional):** resolves a per-note vowel plan into a per-frame F1/F2/F3 formant envelope (resonant peaks with glides between targets) multiplied into the STFT magnitude. When off, output is unchanged. See the next section for details.
+
+## Vowel imprint & languages
+
+The **Vowel character** expander (inside Melody) shapes the melody imprint toward *sung vowel sounds*. A plain harmonic stack has pitch but no vowel identity — it reads as a buzzy "uh". Turning on **Imprint vowels** multiplies vowel resonances (the F1/F2/F3 formant peaks that make "ee" sound different from "ah") into the spectrum, note by note, with speech-like glides between targets.
+
+**What it does NOT do — read this before filing a bug:**
+
+- It adds **vowels only** — no consonants, no words. It cannot make the AI sing specific lyrics.
+- It is a **gentle acoustic bias, not a guarantee**. It nudges the AI toward voice-like output in the selected language's vowel space, but the AI tool's own text prompt (style, language, lyrics) has a much bigger influence on what you get. Think of it as tilting the odds, not steering the wheel.
+- **Off is a valid choice** — the default vowel-neutral buzz gives the AI the most freedom and often produces better instrumental results.
+
+**Language presets.** Each preset pairs a vowel inventory with that language's rhythm rule:
+
+| Language | Vowels | Rhythm rule |
+|----------|--------|-------------|
+| English | 7 full vowels + schwa (Peterson–Barney averages) | Stress-timed: accented notes get a full vowel, weak notes **reduce to schwa**. The **Stress pattern** control (2 = strong-weak, 3 = strong-weak-weak, 4) sets the accent spacing — this strong/reduced alternation is the acoustic signature of English. |
+| Japanese | The five vowels a-i-u-e-o, including the brighter **unrounded Japanese u** ([ɯ]) | Mora-timed: **every note keeps a full vowel** — Japanese has no schwa reduction, so the Stress pattern control is hidden. |
+| Spanish | The five Spanish vowels a-e-i-o-u | Syllable-timed: **every note keeps a full vowel** — no reduction, Stress pattern hidden. |
+
+**Vowel strength** (0–1) dials the effect from a subtle hint to a strong vowel character; start around 0.6 — very high values can sound robotic.
+
+Other languages: syllable- and mora-timed languages without vowel reduction (Korean, Italian, Mandarin, Hindi/Urdu, …) are closest to the Japanese/Spanish pattern; stress-timed languages with reduction (German, Russian) are closest to English. More presets are easy to add — the language data lives in one table in `src/audioprompt_core/formants.py`.
 
 ## Performance & limits
 

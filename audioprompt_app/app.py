@@ -56,7 +56,7 @@ from audioprompt_core.mididrums import (
     loop_lane_events,
     LANES,
 )
-from audioprompt_core.formants import english_vowel_plan
+from audioprompt_core.formants import build_vowel_plan
 from audioprompt_core.midibass import (
     inspect_bass_midi_timing,
     parse_midi_bass_events,
@@ -267,6 +267,16 @@ def _focus_tag(enabled: bool, preset: str | None, focus_band) -> str:
     if focus_band is not None:
         return f"b{int(focus_band[0])}-{int(focus_band[1])}"
     return "custom"
+
+
+def _vowel_tag(language: str, strength: float, accent_period: int) -> str:
+    codes = {"english": "EN", "japanese": "JA", "spanish": "ES"}
+    code = codes.get(language, language[:2].upper())
+    tag = f"{code}-s{int(round(float(strength) * 100))}"
+    if language == "english":
+        # Accent period only shapes the plan for stress-timed English
+        tag += f"-a{int(accent_period)}"
+    return tag
 
 
 def _download_name(kind: str, base_stem: str | None, meta: dict) -> str:
@@ -488,8 +498,9 @@ def build_prompt(
         )
         cp = character_params or {}
         vowel_plan = (
-            english_vowel_plan(
+            build_vowel_plan(
                 events,
+                language=str(cp.get("vowel_language", "english")),
                 accent_period=int(cp.get("accent_period", 2)),
                 seed=seed,
             )
@@ -741,13 +752,31 @@ with left:
                 "Imprint vowels",
                 value=False,
                 help=(
-                    "Shape the melody imprint toward sung vowels. Off = a "
-                    "vowel-neutral buzz, which gives the AI more freedom and "
-                    "often hallucinates instruments better. On = pushes toward "
-                    "English-style sung diction. Turn on when you want clearer "
-                    "words, off for instrumental or open-ended results."
+                    "Shape the melody imprint toward sung vowel sounds in the "
+                    "selected language. Off (default) = a vowel-neutral buzz, "
+                    "which gives the AI more freedom and often hallucinates "
+                    "instruments better. On = biases the output toward "
+                    "voice-like vowel color. This adds vowel resonances only — "
+                    "no consonants, no words; it cannot make the AI sing "
+                    "specific lyrics or guarantee a language."
                 ),
             )
+            _vowel_lang_options = ["English", "Japanese", "Spanish"]
+            vowel_language_label = st.selectbox(
+                "Language",
+                options=_vowel_lang_options,
+                index=0,
+                help=(
+                    "Vowel system used for the imprint. English: full vowels on "
+                    "stressed notes, weak notes reduce to a neutral 'schwa' — the "
+                    "rhythm signature of stress-timed English. Japanese: the five "
+                    "vowels a-i-u-e-o on every note with no reduction (Japanese is "
+                    "mora-timed and keeps every vowel full; its 'u' is the brighter "
+                    "unrounded Japanese u). Spanish: the five Spanish vowels on "
+                    "every note, no reduction (syllable-timed)."
+                ),
+            )
+            vowel_language = vowel_language_label.lower()
             vfcol1, vfcol2 = st.columns(2, gap="small")
             with vfcol1:
                 formant_strength = st.slider(
@@ -759,17 +788,27 @@ with left:
                     ),
                 )
             with vfcol2:
-                accent_period = st.selectbox(
-                    "Stress pattern",
-                    options=[2, 3, 4],
-                    index=0,
-                    help=(
-                        "Accented notes get full vowels; the rest reduce to a "
-                        "neutral 'schwa'. 2 = strong-weak (most English-like), "
-                        "3 = strong-weak-weak (more lilting). Vowel reduction is "
-                        "the acoustic signature of stress-timed English."
-                    ),
-                )
+                if vowel_language == "english":
+                    accent_period = st.selectbox(
+                        "Stress pattern",
+                        options=[2, 3, 4],
+                        index=0,
+                        help=(
+                            "English only. Accented notes get full vowels; the rest "
+                            "reduce to a neutral 'schwa'. 2 = strong-weak (most "
+                            "English-like), 3 = strong-weak-weak (more lilting). "
+                            "Vowel reduction is the acoustic signature of "
+                            "stress-timed English — Japanese and Spanish keep every "
+                            "vowel full, so this control is hidden for them."
+                        ),
+                    )
+                else:
+                    accent_period = 2  # unused: these languages keep every vowel full
+            st.caption(
+                "A gentle acoustic bias, not a lyric engine — it colors the noise "
+                "toward the language's vowel sounds, but the AI tool's own text "
+                "prompt still has the biggest influence on language and words."
+            )
     else:
         # Provide defaults when melody disabled to keep variables defined
         melody_root = "E"
@@ -786,6 +825,7 @@ with left:
         enable_formants = False
         formant_strength = 0.6
         accent_period = 2
+        vowel_language = "english"
         imprint_gain, harmonics, bw_frac = 8.0, 10, 0.01
         melody_noise_floor_db = 0.0
 
@@ -1179,6 +1219,7 @@ with right:
         enable_formants=bool(enable_formants),
         formant_strength=float(formant_strength),
         accent_period=int(accent_period),
+        vowel_language=str(vowel_language),
     )
     focus_params = dict(preset=focus_preset if focus_preset != "none" else None, band=band)
     imprint_params = dict(gain=imprint_gain, harmonics=harmonics, bw_frac=bw_frac,
@@ -1536,7 +1577,7 @@ with right:
                     ),
                     "character": melody_character,
                     "vowel": (
-                        f"EN-s{int(round(formant_strength * 100))}-a{accent_period}"
+                        _vowel_tag(vowel_language, formant_strength, accent_period)
                         if enable_melody and enable_formants else None
                     ),
                     "bw_frac": bw_frac if enable_melody else None,
@@ -1595,7 +1636,7 @@ with right:
                     ),
                     "character": melody_character,
                     "vowel": (
-                        f"EN-s{int(round(formant_strength * 100))}-a{accent_period}"
+                        _vowel_tag(vowel_language, formant_strength, accent_period)
                         if enable_melody and enable_formants else None
                     ),
                     "bw_frac": bw_frac if enable_melody else None,

@@ -71,6 +71,30 @@ def test_vowel_plan_stress_reduction():
     print("  stress reduction:", vowels)
 
 
+def test_language_plans():
+    events = [(0.0, 0.5, 60), (0.5, 1.0, 62), (1.0, 1.5, 64), (1.5, 2.0, 65)]
+    # Japanese and Spanish: every note gets a full vowel from that language's
+    # inventory — no schwa reduction, accent_period has no effect.
+    for lang, prefix in [("japanese", "ja_"), ("spanish", "es_")]:
+        plan = F.build_vowel_plan(events, language=lang, accent_period=2, seed=3)
+        vowels = [v for (_, _, v) in plan]
+        assert len(vowels) == 4
+        assert all(v.startswith(prefix) for v in vowels), f"{lang} plan used {vowels}"
+        assert "schwa" not in vowels
+        print(f"  {lang}: {vowels}")
+    # English via the generic builder still reduces weak beats.
+    plan = F.build_vowel_plan(events, language="english", accent_period=2, seed=3)
+    vowels = [v for (_, _, v) in plan]
+    assert vowels[1] == "schwa" and vowels[3] == "schwa"
+    print(f"  english: {vowels}")
+    # Unknown language is a clear error, not silent fallback.
+    try:
+        F.build_vowel_plan(events, language="klingon")
+        assert False, "unknown language should raise ValueError"
+    except ValueError:
+        print("  unknown language raises ValueError")
+
+
 def test_strength_zero_is_noop():
     y_off, sr = _shape_pink_with_vowel("aa", strength=0.0)
     y_ref, _ = _shape_pink_with_vowel("aa", strength=0.0)
@@ -79,7 +103,7 @@ def test_strength_zero_is_noop():
 
 
 def test_formant_peaks_land_near_targets():
-    for vowel, tol in [("iy", 300), ("aa", 300), ("uw", 300)]:
+    for vowel, tol in [("iy", 300), ("aa", 300), ("uw", 300), ("ja_u", 300), ("es_i", 300)]:
         peaks = _formant_gain_peaks_hz(vowel)
         f1_t, f2_t, _ = F.VOWEL_FORMANTS[vowel]
         near_f1 = min(abs(p - f1_t) for p in peaks)

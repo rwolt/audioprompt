@@ -6,9 +6,23 @@ has no vowel identity (it is closest to a buzzy schwa). This module multiplies
 in a slow-moving *formant envelope* -- two to three resonant peaks that drift
 between vowel targets -- so a hallucinated voice has actual vowels to grab.
 
-Targeting English vowels and, crucially, *reducing toward schwa* on weak
-(unaccented) beats encodes English stress-timing in the spectrum, which biases
-language identity toward English at the acoustic level.
+Language support
+----------------
+Each language preset pairs a vowel inventory with a rhythm rule:
+
+- ``english`` -- stress-timed: accented notes get a full vowel, weak beats
+  *reduce toward schwa*. That long-strong-then-reduced alternation is the
+  acoustic signature that separates English from languages where every vowel
+  stays full, so it biases language identity toward English.
+- ``japanese`` -- mora-timed: the five vowels a/i/u/e/o on EVERY note, no
+  reduction (Japanese has no schwa collapse). The /u/ target is the unrounded
+  Japanese [ɯ] (F2 ~1300 Hz), noticeably brighter than English "who".
+- ``spanish`` -- syllable-timed: the five Spanish vowels on every note, no
+  reduction.
+
+The formant machinery below (trajectories, glides, resonance envelopes) is
+language-agnostic; only the vowel tables and the plan builder know about
+languages.
 
 Design notes
 ------------
@@ -19,8 +33,9 @@ Design notes
   into ``mag`` per frame -- same pattern as the existing focus band.
 - Pure NumPy. No new dependencies.
 
-Formant values are adult-average ballparks (Peterson-Barney lineage); they are
-meant to steer a model, not to pass a phonetics exam.
+Formant values are adult-average ballparks (Peterson-Barney lineage for
+English; published adult averages for Japanese and Spanish); they are meant to
+steer a model, not to pass a phonetics exam.
 """
 from __future__ import annotations
 
@@ -28,7 +43,8 @@ from typing import Iterable, Sequence
 
 import numpy as np
 
-# (F1, F2, F3) in Hz. Corners of the English vowel space plus schwa.
+# (F1, F2, F3) in Hz. English entries are corners of the English vowel space
+# plus schwa; ja_*/es_* entries are the Japanese and Spanish five-vowel systems.
 VOWEL_FORMANTS: dict[str, tuple[float, float, float]] = {
     "iy": (270.0, 2300.0, 3000.0),   # heed
     "ih": (400.0, 2000.0, 2550.0),   # hid
@@ -39,10 +55,83 @@ VOWEL_FORMANTS: dict[str, tuple[float, float, float]] = {
     "uh": (640.0, 1190.0, 2390.0),   # hud
     "uw": (300.0, 870.0, 2240.0),    # who
     "schwa": (500.0, 1500.0, 2500.0),  # unstressed reduced vowel
+    # Japanese: a i u e o. The u is unrounded [ɯ] -- its high F2 (~1300 Hz vs
+    # ~870 Hz for English uw) is the signature difference from English.
+    "ja_a": (750.0, 1250.0, 2600.0),
+    "ja_i": (290.0, 2250.0, 3000.0),
+    "ja_u": (320.0, 1300.0, 2350.0),
+    "ja_e": (470.0, 1950.0, 2600.0),
+    "ja_o": (470.0, 850.0, 2500.0),
+    # Spanish: a e i o u. Rounded [u], clean five-vowel system.
+    "es_a": (700.0, 1300.0, 2500.0),
+    "es_e": (460.0, 1950.0, 2600.0),
+    "es_i": (300.0, 2300.0, 3000.0),
+    "es_o": (460.0, 880.0, 2500.0),
+    "es_u": (320.0, 750.0, 2300.0),
+}
+
+# Per-language plan config: which full vowels to rotate through, and whether
+# weak (unaccented) beats reduce to a target vowel. ``reduce_weak_to=None``
+# means every sung note gets a full vowel and the accent period is ignored --
+# correct for mora-timed (Japanese) and syllable-timed (Spanish) languages,
+# which have no English-style vowel reduction.
+LANGUAGES: dict[str, dict] = {
+    "english": {
+        "full_vowels": ("aa", "ae", "eh", "iy", "ao", "uw", "ih"),
+        "reduce_weak_to": "schwa",
+    },
+    "japanese": {
+        "full_vowels": ("ja_a", "ja_i", "ja_u", "ja_e", "ja_o"),
+        "reduce_weak_to": None,
+    },
+    "spanish": {
+        "full_vowels": ("es_a", "es_e", "es_i", "es_o", "es_u"),
+        "reduce_weak_to": None,
+    },
 }
 
 # A compact set of "full" vowels to rotate through on accented beats.
-_FULL_VOWELS: tuple[str, ...] = ("aa", "ae", "eh", "iy", "ao", "uw", "ih")
+_FULL_VOWELS: tuple[str, ...] = LANGUAGES["english"]["full_vowels"]
+
+
+def build_vowel_plan(
+    events: Sequence[tuple[float, float, object]],
+    *,
+    language: str = "english",
+    accent_period: int = 2,
+    accent_offset: int = 0,
+    seed: int | None = None,
+) -> list[tuple[float, float, str]]:
+    """Assign vowels to gate events using a language's vowel system.
+
+    For stress-timed languages (``reduce_weak_to`` set), every
+    ``accent_period``-th *sung* note (rests are skipped) gets a full vowel and
+    the rest collapse to the reduction target. For languages without vowel
+    reduction (Japanese, Spanish), every sung note gets a full vowel and
+    ``accent_period`` has no effect.
+
+    Returns a list of ``(t0, t1, vowel_key)`` for sung notes only.
+    """
+    if language not in LANGUAGES:
+        raise ValueError(f"Unknown language: {language!r} (have {sorted(LANGUAGES)})")
+    cfg = LANGUAGES[language]
+    full_vowels = cfg["full_vowels"]
+    reduce_to = cfg["reduce_weak_to"]
+
+    rng = np.random.default_rng(seed)
+    plan: list[tuple[float, float, str]] = []
+    sung_idx = 0
+    for (t0, t1, midi) in events:
+        if midi is None:
+            continue
+        is_accent = ((sung_idx + accent_offset) % max(1, accent_period)) == 0
+        if reduce_to is None or is_accent:
+            vowel = full_vowels[rng.integers(0, len(full_vowels))]
+        else:
+            vowel = reduce_to
+        plan.append((float(t0), float(t1), vowel))
+        sung_idx += 1
+    return plan
 
 
 def english_vowel_plan(
@@ -52,43 +141,14 @@ def english_vowel_plan(
     accent_offset: int = 0,
     seed: int | None = None,
 ) -> list[tuple[float, float, str]]:
-    """Assign vowels to gate events with English-style stress reduction.
-
-    Every ``accent_period``-th *sung* note (rests are skipped) gets a full
-    vowel; the rest collapse to schwa. The long/strong-then-reduced alternation
-    is the acoustic signature that separates stress-timed English from
-    syllable-timed languages where every vowel stays full.
-
-    Parameters
-    ----------
-    events:
-        Iterable of ``(t0, t1, midi)`` as produced by the melody generator.
-        A ``midi`` of ``None`` marks a rest and is skipped (no vowel).
-    accent_period:
-        Place a full vowel every N sung notes (2 = strong-weak, 3 = strong-weak-weak).
-    accent_offset:
-        Phase of the accent pattern.
-    seed:
-        Controls which full vowels are chosen, for repeatability.
-
-    Returns
-    -------
-    list of ``(t0, t1, vowel_key)`` for sung notes only.
-    """
-    rng = np.random.default_rng(seed)
-    plan: list[tuple[float, float, str]] = []
-    sung_idx = 0
-    for (t0, t1, midi) in events:
-        if midi is None:
-            continue
-        is_accent = ((sung_idx + accent_offset) % max(1, accent_period)) == 0
-        if is_accent:
-            vowel = _FULL_VOWELS[rng.integers(0, len(_FULL_VOWELS))]
-        else:
-            vowel = "schwa"
-        plan.append((float(t0), float(t1), vowel))
-        sung_idx += 1
-    return plan
+    """Back-compat wrapper for ``build_vowel_plan(language="english")``."""
+    return build_vowel_plan(
+        events,
+        language="english",
+        accent_period=accent_period,
+        accent_offset=accent_offset,
+        seed=seed,
+    )
 
 
 def vowel_traj_from_plan(
