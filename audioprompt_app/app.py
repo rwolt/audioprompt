@@ -357,6 +357,12 @@ st.markdown(
     .dl-row + div[data-testid="stHorizontalBlock"] .stButton button { width: auto; }
     /* Add horizontal padding to main two columns */
     /* Use Streamlit columns(gap=...) for spacing; no extra CSS gap/padding needed here. */
+    /* Selectboxes are BaseWeb comboboxes — a text <input> under the hood
+       (that's what enables type-to-filter), so browsers default to the
+       I-beam cursor. Show a pointer to match what the control looks like. */
+    div[data-baseweb="select"] { cursor: pointer; }
+    div[data-baseweb="select"] input { cursor: pointer !important; }
+    div[data-baseweb="select"] div { cursor: pointer; }
     .footer-note { font-size: 0.85rem; opacity: 0.75; margin: 0; }
     /* Hide the tiny iframe container used for JS injection at footer */
     .js-hook + div[data-testid="stElementContainer"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
