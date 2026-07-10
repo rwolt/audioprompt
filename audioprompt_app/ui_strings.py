@@ -21,6 +21,8 @@ JA: dict[str, str] = {
     "Show help as visible text": "ヘルプをテキストで表示",
     "Shows each control's explanation as plain text under the control instead of a hover tooltip. Recommended for screen readers; also lets the language setting translate every explanation.":
         "各コントロールの説明を、ホバー式ツールチップではなくコントロールの下にテキストとして表示します。スクリーンリーダー使用時に推奨。言語設定による説明の翻訳もこのモードで確実になります。",
+    "Screen reader tip: check the 'Show help as visible text' checkbox below to read every control's explanation as regular text instead of hover-only tooltips.":
+        "スクリーンリーダーをお使いの方へ: この下の「ヘルプをテキストで表示」チェックボックスをオンにすると、各コントロールの説明がホバー式ツールチップではなく通常のテキストとして読めるようになります。",
 
     # ---- section headers ----
     "Quick Start": "クイックスタート",

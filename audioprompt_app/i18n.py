@@ -80,6 +80,21 @@ def render_controls() -> None:
     screen reader reaches. The selector label is bilingual because it must be
     findable before a language has been chosen.
     """
+    # Visually hidden hint, announced only by screen readers (standard
+    # sr-only CSS). Screen readers cannot be detected — by deliberate browser
+    # design, to avoid disclosing disability status — so instead this tells
+    # them about the help-as-text mode before they reach the toggle.
+    st.markdown(
+        "<div style=\"position:absolute;width:1px;height:1px;padding:0;margin:-1px;"
+        "overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;\">"
+        + t(
+            "Screen reader tip: check the 'Show help as visible text' checkbox "
+            "below to read every control's explanation as regular text instead "
+            "of hover-only tooltips."
+        )
+        + "</div>",
+        unsafe_allow_html=True,
+    )
     codes = ["en"] + sorted(TABLES)
     col_lang, col_help, _spacer = st.columns([1.1, 1.9, 3.0])
     with col_lang:
