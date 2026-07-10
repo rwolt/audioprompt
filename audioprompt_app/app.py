@@ -319,9 +319,14 @@ def _download_name(kind: str, base_stem: str | None, meta: dict) -> str:
 st.markdown(
     """
     <style>
-    /* Enough top padding to clear Streamlit's fixed header — the language and
-       help-mode controls render first and must not be clipped by it. */
-    .block-container{padding-top:4.25rem;padding-bottom:0.75rem; max-width:80vw; margin-left:auto; margin-right:auto;}
+    /* Hide Streamlit's fixed header/toolbar entirely: it holds nothing
+       visitors need (just the ⋮ menu; Deploy is dev-only) and its 60px
+       pushed all content down. Trade-off: the tiny top-right "Running…"
+       indicator goes too — the app shows its own spinner during renders. */
+    header[data-testid="stHeader"] { display: none !important; }
+    .block-container{padding-top:1.25rem;padding-bottom:0.75rem; max-width:80vw; margin-left:auto; margin-right:auto;}
+    /* Tuck the page title closer to the language/help controls row */
+    .block-container h1 { padding-top: 0.25rem; }
     /* Keep Streamlit's primary theme color for the button; minimal tweaks only */
     div.stButton > button[kind="primary"] { padding: 0.9rem 1.25rem; font-size: 1.05rem; border-radius: 10px; }
     /* Prevent download labels from wrapping */
