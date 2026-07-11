@@ -4,7 +4,7 @@
 
 AI音楽ツールを誘導するための、短い「オーディオプロンプト」を生成します。AudioPromptは、スケールに沿ったメロディをピンクノイズにインプリントし、MIDIファイルからドラム・ベースレイヤーを追加し、ボーカル／ギター／ベースの周波数帯域を強調し、アップロード用にプロンプトをトラックの先頭に連結できます。
 
-**ライブデモ:** [https://audioprompt.streamlit.app/](https://audioprompt.streamlit.app/)
+**ライブデモ:** [https://audioprompt.taktlabs.io/](https://audioprompt.taktlabs.io/)
 
 📖 **アプリの詳細マニュアル**（全コントロールの説明、MIDIドラムマップ、DSPの仕組み・英語）: [`audioprompt_app/README.md`](audioprompt_app/README.md)
 

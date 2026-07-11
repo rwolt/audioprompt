@@ -341,17 +341,17 @@ AudioPromptは、AI音楽モデルを誘導できる短いピンクノイズク�
     },
     "footer_links": {
         "en": (
-            'AudioPrompt is open source: '
+            'This project is open source: '
             '<a href="https://github.com/rwolt/audioprompt" target="_blank" rel="noopener">GitHub repository</a> · '
-            '<a href="https://github.com/rwolt/audioprompt/blob/main/audioprompt_app/README.md" target="_blank" rel="noopener">app manual</a>'
-            ' — bug reports and translation fixes welcome.'
+            '<a href="https://github.com/rwolt/audioprompt/blob/main/audioprompt_app/README.md" target="_blank" rel="noopener">app manual</a> · '
+            'Part of <a href="https://taktlabs.io" target="_blank" rel="noopener">taktlabs.io</a> →'
         ),
         "ja": (
-            'AudioPromptはオープンソースです: '
+            'このプロジェクトはオープンソースです: '
             '<a href="https://github.com/rwolt/audioprompt" target="_blank" rel="noopener">GitHubリポジトリ</a>'
             '（<a href="https://github.com/rwolt/audioprompt/blob/main/README.ja.md" target="_blank" rel="noopener">日本語README</a>）・'
-            '<a href="https://github.com/rwolt/audioprompt/blob/main/audioprompt_app/README.md" target="_blank" rel="noopener">アプリマニュアル（英語）</a>'
-            ' — 不具合報告や訳文の改善提案を歓迎します。'
+            '<a href="https://github.com/rwolt/audioprompt/blob/main/audioprompt_app/README.md" target="_blank" rel="noopener">アプリマニュアル（英語）</a>・'
+            '<a href="https://taktlabs.io" target="_blank" rel="noopener">taktlabs.io</a> のプロジェクト →'
         ),
     },
 }

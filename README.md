@@ -4,7 +4,7 @@
 
 Create short, steerable "audio prompts" to nudge AI music tools. AudioPrompt imprints a scale-constrained melody onto pink noise, adds optional drum and bass layers from your MIDI files, emphasizes vocal/guitar/bass frequency bands, and can prepend the prompt to your track for upload.
 
-**Live demo:** [https://audioprompt.streamlit.app/](https://audioprompt.streamlit.app/)
+**Live demo:** [https://audioprompt.taktlabs.io/](https://audioprompt.taktlabs.io/)
 
 📖 **Full app manual** (every control, the MIDI drum map, how the DSP works): [`audioprompt_app/README.md`](audioprompt_app/README.md)
 
