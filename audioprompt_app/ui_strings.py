@@ -159,8 +159,8 @@ JA: dict[str, str] = {
     "Repeats the drum MIDI when the prompt is longer than the MIDI region. Turn off to let the drums stop after the uploaded MIDI ends.":
         "プロンプトがMIDIリージョンより長い場合にドラムMIDIを繰り返します。オフにするとMIDI終了後にドラムが止まります。",
     "Trim silence before first note": "最初のノート前の無音をカット",
-    "Removes empty lead-in before the first drum hit (e.g. Logic session-player exports add a phantom bar). Turn off if your drums genuinely start with deliberate leading silence.":
-        "最初のドラムヒット前の空白をカットします（Logicのセッションプレイヤー書き出しなどで入る余分な小節への対策）。意図的な先頭無音がある場合はオフにしてください。",
+    "Removes the empty bars a DAW adds when the exported region didn't start at bar 1 of the project — the export timeline starts at project bar 1, so region position becomes leading silence in the file. Silence inside the region, like drums resting for the first bars of a loop, is preserved. Turn off to keep the file's raw timing.":
+        "書き出したリージョンがプロジェクトの1小節目から始まっていない場合にDAWが付加する先頭の空白小節を取り除きます — 書き出しのタイムラインはプロジェクトの1小節目から始まるため、リージョンの位置がそのままファイル先頭の無音になります。ループの最初の数小節を休むなど、リージョン内の無音は保持されます。オフにするとファイルの元のタイミングをそのまま使います。",
 
     # ---- bass MIDI ----
     "Enable bass MIDI imprint": "ベースMIDIインプリントを有効化",
@@ -179,8 +179,10 @@ JA: dict[str, str] = {
     "Scales the length of the bass note envelope decay.":
         "ベースノートのエンベロープ減衰の長さを調整します。",
     "Pitch bend range": "ピッチベンドレンジ",
-    "Matches the pitch wheel range of the virtual instrument that generated the MIDI (Logic slides often use 12, 24, or 48 semitones).":
-        "MIDIを生成した音源のピッチホイールレンジに合わせてください（Logicのスライドは12、24、48半音が多いです）。",
+    "Pitch-wheel range of the instrument that generated the MIDI, in semitones. Detected automatically when the file declares it (RPN); otherwise match your instrument's setting — slide-heavy bass patches often use 12, 24, or 48.":
+        "MIDIを生成した音源のピッチホイールレンジ（半音単位）。ファイル内に宣言（RPN）があれば自動検出されます。ない場合は音源の設定に合わせてください — スライドを多用するベース音源では12、24、48が一般的です。",
+    "Detected pitch bend range: {n} semitones (declared in the MIDI file).":
+        "検出されたピッチベンドレンジ: {n}半音（MIDIファイル内の宣言より）。",
     "Match melody BPM (Bass)": "メロディBPMに合わせる（ベース）",
     "Use the melody BPM for the bass layer.": "ベースレイヤーにメロディBPMを使用します。",
     "Reset Independent bass BPM to the tempo detected in the uploaded MIDI file.":
@@ -189,8 +191,8 @@ JA: dict[str, str] = {
     "Loop bass to prompt length": "プロンプト長までベースをループ",
     "Repeats the bass MIDI when the prompt is longer than the MIDI region.":
         "プロンプトがMIDIリージョンより長い場合にベースMIDIを繰り返します。",
-    "Removes empty lead-in before the first note (e.g. Logic session-player exports add a phantom bar). Preserves an intentional pickup or rest that's written on the note itself. Turn off if your bass should start with deliberate leading silence.":
-        "最初のノート前の空白をカットします（Logicのセッションプレイヤー書き出しなどで入る余分な小節への対策）。ノート自体に書かれたピックアップや休符は保持されます。意図的な先頭無音がある場合はオフにしてください。",
+    "Removes the empty bars a DAW adds when the exported region didn't start at bar 1 of the project — the export timeline starts at project bar 1, so region position becomes leading silence in the file. Silence inside the region, like a bass entering at bar 5, and pickups written on the first note are preserved. Turn off to keep the file's raw timing.":
+        "書き出したリージョンがプロジェクトの1小節目から始まっていない場合にDAWが付加する先頭の空白小節を取り除きます — 書き出しのタイムラインはプロジェクトの1小節目から始まるため、リージョンの位置がそのままファイル先頭の無音になります。5小節目から入るベースなどリージョン内の無音や、最初のノートに書かれたピックアップは保持されます。オフにするとファイルの元のタイミングをそのまま使います。",
     "Bass – Advanced": "ベース – 詳細設定",
     "Bass imprint gain": "ベースインプリントゲイン",
     "Strength of harmonic emphasis on the bass pitch mask.":

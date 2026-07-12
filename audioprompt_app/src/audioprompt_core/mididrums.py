@@ -7,6 +7,8 @@ from typing import Dict, List, Tuple, Union
 import numpy as np
 import mido
 
+from .midiregion import region_start_ticks
+
 
 # General MIDI drum note mapping (channel 9/10)
 DRUM_LANE_MAP = {
@@ -221,20 +223,31 @@ def parse_midi_drum_events(
     for lane in lanes:
         lanes[lane].sort(key=lambda x: x[0])
 
-    # Strip phantom leading silence (e.g. DAW session-player exports prepend a
-    # phantom bar). For drums, leading silence lives in the first note's own
-    # delta rather than preceding controller messages, so we shift by the
-    # minimum start time across all lanes. A genuine pickup or intentional
-    # intro silence can be preserved by setting trim_leading_silence=False.
+    # Strip export padding. Logic exports MIDI with tick 0 at project bar 1
+    # and marks the region's true start with its smpte_offset/set_tempo meta
+    # stamp — everything before the stamp is region-position padding (the
+    # "phantom bar" a region sitting at bar 2 arrives with), while silence
+    # after the stamp is musical content (e.g. drums resting until bar 5)
+    # and is preserved. Files with no stamp at all give us no way to tell
+    # padding from content, so fall back to the legacy behavior of shifting
+    # the earliest hit to zero.
     if trim_leading_silence:
-        all_starts = [s for events in lanes.values() for (s, _, _) in events]
-        if all_starts:
-            min_start = min(all_starts)
-            if min_start > 0.01:
-                lanes = {
-                    lane: [(s - min_start, d, v) for (s, d, v) in events]
-                    for lane, events in lanes.items()
-                }
+        region_ticks = region_start_ticks(midi_file)
+        if region_ticks is None:
+            all_starts = [s for events in lanes.values() for (s, _, _) in events]
+            min_start = min(all_starts) if all_starts else 0.0
+            region_s = min_start if min_start > 0.01 else 0.0
+        else:
+            region_s = ticks_to_seconds(
+                region_ticks, tpb, resolve_tempo_at_tick(region_ticks)
+            )
+        if region_s > 0.0:
+            # Clamp: humanization can place the first hit a few ticks
+            # ahead of the barline the stamp sits on.
+            lanes = {
+                lane: [(max(0.0, s - region_s), d, v) for (s, d, v) in events]
+                for lane, events in lanes.items()
+            }
 
     return lanes, bpm
 

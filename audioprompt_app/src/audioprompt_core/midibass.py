@@ -6,6 +6,45 @@ from typing import List, Tuple
 import numpy as np
 import mido
 
+from .midiregion import region_start_ticks
+
+
+def detect_pitch_bend_range(midi_bytes: bytes) -> float | None:
+    """Read the pitch-bend range a MIDI file declares via RPN 0 (if any).
+
+    DAWs that export expressive bass parts (e.g. Logic's Bass Player, which
+    exports as MPE) declare the instrument's bend range in-file with the RPN
+    sequence CC101=0, CC100=0 (select RPN 0 "pitch bend sensitivity"), then
+    CC6 = semitones and optionally CC38 = cents. Returns the declared range
+    in semitones, or None when the file doesn't declare one.
+
+    Only data entry while RPN 0 is selected counts — MPE exports also carry
+    an RPN 6 zone-configuration message whose CC6 value is a channel count,
+    not a bend range.
+    """
+    midi_file = mido.MidiFile(file=BytesIO(midi_bytes))
+    for track in midi_file.tracks:
+        rpn: dict[int, tuple[int, int]] = {}  # channel -> (msb, lsb)
+        semis: dict[int, int] = {}
+        cents: dict[int, int] = {}
+        for msg in track:
+            if msg.type != "control_change":
+                continue
+            ch = msg.channel
+            msb, lsb = rpn.get(ch, (127, 127))  # 127,127 = RPN null
+            if msg.control == 101:
+                rpn[ch] = (msg.value, lsb)
+            elif msg.control == 100:
+                rpn[ch] = (msb, msg.value)
+            elif msg.control == 6 and rpn.get(ch) == (0, 0):
+                semis[ch] = msg.value
+            elif msg.control == 38 and rpn.get(ch) == (0, 0):
+                cents[ch] = msg.value
+        if semis:
+            ch = min(semis)
+            return float(semis[ch]) + cents.get(ch, 0) / 100.0
+    return None
+
 def inspect_bass_midi_timing(midi_bytes: bytes) -> dict:
     midi_file = mido.MidiFile(file=BytesIO(midi_bytes))
     tempo = 500000
@@ -33,12 +72,18 @@ def parse_midi_bass_events(midi_bytes: bytes, pitch_bend_range: float = 12.0, tr
     Parameters
     ----------
     trim_leading_silence:
-        When True (default), subtract the time consumed by non-note events
-        (controllers, meta messages) that precede the first note_on.  This
-        removes the phantom bar some DAWs prepend while preserving any
-        intentional pickup, because a pickup's offset lives on the note's
-        own delta — not in prior non-note deltas.  Set False to return raw
-        absolute timing unchanged.
+        When True (default), remove the export's region-position offset:
+        Logic exports MIDI with tick 0 at project bar 1, so a region that
+        sat at bar 2 arrives with one bar of padding. The region's true
+        start is marked in-file by the smpte_offset/set_tempo meta stamp
+        (see midiregion.region_start_ticks) — everything before the stamp
+        is padding and is removed; silence after it is musical content
+        (e.g. a bass entering at bar 5) and is preserved. When the stamp
+        sits at 0, fall back to subtracting time consumed by non-note
+        events (controllers/meta) preceding the first note_on, which
+        catches exports whose padding rides on a controller's delta while
+        still preserving pickups written on the note's own delta. Set
+        False to return raw absolute timing unchanged.
 
     Returns
     -------
@@ -58,6 +103,14 @@ def parse_midi_bass_events(midi_bytes: bytes, pitch_bend_range: float = 12.0, tr
                 break
 
     bpm = mido.tempo2bpm(tempo)
+
+    # Region-position offset (Logic: tick 0 = project bar 1, meta stamp at
+    # region start). None when the file carries no stamp at all.
+    region_ticks = region_start_ticks(midi_file)
+    region_s = (
+        mido.tick2second(region_ticks, ticks_per_beat, tempo)
+        if region_ticks else 0.0
+    )
 
     # We'll assume the longest track with notes is the bass track
     best_track_events: List[Tuple[float, float, int, float]] = []
@@ -106,14 +159,27 @@ def parse_midi_bass_events(midi_bytes: bytes, pitch_bend_range: float = 12.0, tr
             if current_time_s > start_t:
                 track_events.append((start_t, current_time_s, note, vel))
 
-        # Bug 2: strip phantom non-note lead time (only when requested).
-        # A lead_time of 0 (clean MIDI or genuine pickup) leaves everything unchanged.
+        # Strip export padding (only when requested).
         if lead_time is None:
             lead_time = 0.0
-        if trim_leading_silence and lead_time > 0.0:
-            track_events = [(s - lead_time, e - lead_time, m, v)
-                            for s, e, m, v in track_events]
-            track_bends = [(max(0.0, t - lead_time), b) for t, b in track_bends]
+        if trim_leading_silence:
+            if region_s > 0.0:
+                # Region stamp marks the true start: everything before it is
+                # project-position padding. Clamp because humanization can
+                # place the first note a few ticks ahead of the barline.
+                track_events = [
+                    (max(0.0, s - region_s), max(max(0.0, s - region_s) + 0.01, e - region_s), m, v)
+                    for s, e, m, v in track_events
+                ]
+                track_bends = [(max(0.0, t - region_s), b) for t, b in track_bends]
+            elif lead_time > 0.0:
+                # No region offset — fall back to stripping non-note lead
+                # time (padding carried on a controller/meta delta). A
+                # lead_time of 0 (clean MIDI or genuine pickup) leaves
+                # everything unchanged.
+                track_events = [(s - lead_time, e - lead_time, m, v)
+                                for s, e, m, v in track_events]
+                track_bends = [(max(0.0, t - lead_time), b) for t, b in track_bends]
 
         if len(track_events) > len(best_track_events):
             best_track_events = track_events

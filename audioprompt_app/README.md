@@ -72,15 +72,15 @@ Both are optional. With neither set, the app runs fully unrestricted and collect
 - **Drum character / Snare tune / Drum decay:** compact tone, tuning, and envelope-length controls.
 - **Match melody BPM / Independent drum BPM / Use detected BPM:** tempo targeting. New uploads start at their detected MIDI BPM.
 - **Loop drums to prompt length:** repeats the MIDI when the prompt is longer than the region.
-- **Trim silence before first note:** strips empty lead-in (e.g. Logic session-player exports add a phantom bar).
+- **Trim silence before first note:** removes the empty bars that appear when the exported region didn't start at bar 1 of the project; silence you wrote into the region (e.g. drums resting for the first bars of a loop) is preserved. See [Leading silence in MIDI exports](#leading-silence-in-midi-exports).
 
 **Bass MIDI Imprint** (when enabled)
 
 - **Bass MIDI (.mid/.midi):** pitch bend and note velocity are preserved. Detected BPM and length are shown on upload.
 - **Bass character:** Upright, Fingerstyle, Picked, Synth, or Sub — changes harmonic balance and frequency band.
 - **Note shape base / Decay offset:** envelope controls before velocity is applied.
-- **Pitch bend range:** must match the pitch-wheel range of the instrument that generated the MIDI (Logic slides often use 12, 24, or 48 semitones).
-- **Tempo, looping, and trim-silence controls:** same pattern as the drum layer.
+- **Pitch bend range:** must match the pitch-wheel range of the instrument that generated the MIDI. When the file declares its range (an RPN "pitch bend sensitivity" message — Logic's Bass Player exports include one), the slider defaults to the detected value and a caption confirms it; otherwise set it by hand (12, 24, and 48 semitones are common for slide-capable bass patches). If slides come out too shallow or too extreme, this number is wrong.
+- **Tempo, looping, and trim-silence controls:** same pattern as the drum layer; the bass trim additionally preserves a pickup written on the first note. See [Leading silence in MIDI exports](#leading-silence-in-midi-exports).
 - **Advanced:** bass imprint gain, BW frac, and noise floor (dB).
 
 **Focus** (when enabled)
@@ -124,7 +124,18 @@ Notes:
 
 - Every note not matched by the kick/snare/hat rows routes to the **perc** lane, including non-GM notes.
 - The parser reads **all tracks**, since some DAWs export drums across multiple tracks.
-- Quickest setup from Logic Session Drummer: convert the drummer region to MIDI and leave notes on their GM drum pitches. Start with kick/snare/hat, then use Perc amount for auxiliary percussion.
+- Quickest setup from a DAW drummer / session-player feature: convert the generated region to MIDI and leave notes on their GM drum pitches. Start with kick/snare/hat, then use Perc amount for auxiliary percussion.
+
+## Leading silence in MIDI exports
+
+Both MIDI layers have a **Trim silence before first note** switch (on by default). The problem it solves: DAWs export MIDI with **tick 0 at bar 1 of the project**, not at the start of the exported region. If your region sat at bar 2 of the arrangement, the file arrives with a bar of silence that was never part of the music — and in a 3–6 s prompt, one bar of dead air is a third or more of the steer.
+
+The rule trim follows:
+
+- Logic marks the region's true start inside the file (a tempo/SMPTE meta stamp at the region position). Everything **before** that marker is export padding and is removed.
+- Silence **after** the marker is music and is preserved: a bass entering at bar 5 of an 8-bar loop keeps its 4-bar rest, and a pickup written on the first note keeps its offset.
+- Files without any marker fall back to simpler heuristics — the drum layer shifts the earliest hit to zero; the bass layer strips only lead-in carried by non-note messages (some Logic Bass Player exports park a controller event a bar before the first note).
+- Turn trim **off** to use the file's raw timing exactly as exported.
 
 ## How it works (core pieces)
 

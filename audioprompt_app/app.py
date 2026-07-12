@@ -59,6 +59,7 @@ from audioprompt_core.mididrums import (
 from audioprompt_core.formants import build_vowel_plan
 from audioprompt_core.midibass import (
     inspect_bass_midi_timing,
+    detect_pitch_bend_range,
     parse_midi_bass_events,
     scale_bass_events,
     loop_bass_events,
@@ -1021,9 +1022,12 @@ with left:
             # widget) the auto-generated IDs would collide.
             key="drum_trim_silence_cb",
             help=(
-                "Removes empty lead-in before the first drum hit "
-                "(e.g. Logic session-player exports add a phantom bar). "
-                "Turn off if your drums genuinely start with deliberate leading silence."
+                "Removes the empty bars a DAW adds when the exported region "
+                "didn't start at bar 1 of the project — the export timeline "
+                "starts at project bar 1, so region position becomes leading "
+                "silence in the file. Silence inside the region, like drums "
+                "resting for the first bars of a loop, is preserved. Turn "
+                "off to keep the file's raw timing."
             ),
         )
     else:
@@ -1091,7 +1095,27 @@ with left:
         with bcol4:
             bass_decay_offset = st.slider("Decay offset", 0.1, 3.0, 1.0, 0.1, help="Scales the length of the bass note envelope decay.")
         with bcol5:
-            bass_pb_range = st.slider("Pitch bend range", 1, 48, 12, 1, help="Matches the pitch wheel range of the virtual instrument that generated the MIDI (Logic slides often use 12, 24, or 48 semitones).")
+            detected_pb_range = None
+            if bass_midi_file is not None:
+                try:
+                    detected_pb_range = detect_pitch_bend_range(bass_midi_file.getvalue())
+                except Exception:
+                    detected_pb_range = None
+            bass_pb_range = st.slider(
+                "Pitch bend range", 1, 48,
+                int(round(detected_pb_range)) if detected_pb_range else 12, 1,
+                help=(
+                    "Pitch-wheel range of the instrument that generated the "
+                    "MIDI, in semitones. Detected automatically when the file "
+                    "declares it (RPN); otherwise match your instrument's "
+                    "setting — slide-heavy bass patches often use 12, 24, or 48."
+                ),
+            )
+            if detected_pb_range:
+                st.caption(t(
+                    "Detected pitch bend range: {n} semitones (declared in the MIDI file).",
+                    n=f"{detected_pb_range:g}",
+                ))
             
         btempo1, btempo2 = st.columns(2, gap="small")
         with btempo1:
@@ -1142,11 +1166,12 @@ with left:
             value=True,
             key="bass_trim_silence_cb",  # see drum twin: avoids duplicate auto-ID
             help=(
-                "Removes empty lead-in before the first note "
-                "(e.g. Logic session-player exports add a phantom bar). "
-                "Preserves an intentional pickup or rest that's written on "
-                "the note itself. Turn off if your bass should start with "
-                "deliberate leading silence."
+                "Removes the empty bars a DAW adds when the exported region "
+                "didn't start at bar 1 of the project — the export timeline "
+                "starts at project bar 1, so region position becomes leading "
+                "silence in the file. Silence inside the region, like a bass "
+                "entering at bar 5, and pickups written on the first note "
+                "are preserved. Turn off to keep the file's raw timing."
             ),
         )
         with st.expander("Bass – Advanced", expanded=False):
