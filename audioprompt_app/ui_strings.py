@@ -52,6 +52,28 @@ JA: dict[str, str] = {
     "Root": "ルート",
     "Root note for the scale (C4=60).": "スケールのルート音 (C4=60)。",
     "Scale": "スケール",
+    # Scale display names (see SCALE_DISPLAY below; raw tokens stay as values)
+    "Major": "メジャー",
+    "Natural minor": "ナチュラルマイナー",
+    "Dorian": "ドリアン",
+    "Mixolydian": "ミクソリディアン",
+    "Pentatonic": "ペンタトニック",
+    "Harmonic minor": "ハーモニックマイナー",
+    "Minor pentatonic": "マイナーペンタトニック",
+    "Major pentatonic": "メジャーペンタトニック",
+    "Minor blues": "マイナーブルース",
+    "Major blues": "メジャーブルース",
+    "Lydian": "リディアン",
+    "Phrygian": "フリジアン",
+    "Aeolian": "エオリアン",
+    "Locrian": "ロクリアン",
+    "Melodic minor": "メロディックマイナー",
+    "Harmonic major": "ハーモニックメジャー",
+    "Double harmonic": "ダブルハーモニック",
+    "Whole tone": "ホールトーン",
+    "Octatonic (whole–half)": "オクタトニック（全半）",
+    "Octatonic (half–whole)": "オクタトニック（半全）",
+    "Chromatic": "クロマチック",
     "Choose from major/modes, pentatonics, blues, etc.":
         "メジャー／モード、ペンタトニック、ブルースなどから選択。",
     "BPM": "BPM",
@@ -310,6 +332,34 @@ JA: dict[str, str] = {
 }
 
 TABLES: dict[str, dict[str, str]] = {"ja": JA}
+
+# Display names for the raw scale tokens used as selectbox values. Only the
+# rendered text changes (via format_func) — the returned value stays the raw
+# token, so filename tags and all comparisons keep working. The pretty names
+# are also JA translation keys above.
+SCALE_DISPLAY: dict[str, str] = {
+    "major": "Major",
+    "natural_minor": "Natural minor",
+    "dorian": "Dorian",
+    "mixolydian": "Mixolydian",
+    "pentatonic": "Pentatonic",
+    "harmonic_minor": "Harmonic minor",
+    "minor_pentatonic": "Minor pentatonic",
+    "major_pentatonic": "Major pentatonic",
+    "minor_blues": "Minor blues",
+    "major_blues": "Major blues",
+    "lydian": "Lydian",
+    "phrygian": "Phrygian",
+    "aeolian": "Aeolian",
+    "locrian": "Locrian",
+    "melodic_minor": "Melodic minor",
+    "harmonic_major": "Harmonic major",
+    "double_harmonic": "Double harmonic",
+    "whole_tone": "Whole tone",
+    "octatonic_whole_half": "Octatonic (whole–half)",
+    "octatonic_half_whole": "Octatonic (half–whole)",
+    "chromatic": "Chromatic",
+}
 
 # Multi-line content blocks, keyed by name then language. Kept out of the
 # literal-keyed table so indentation/formatting changes in app.py can't break

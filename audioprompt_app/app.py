@@ -102,6 +102,7 @@ GOATCOUNTER_URL = os.environ.get("GOATCOUNTER_URL", "").strip() or None
 # screen reader reaches.
 import i18n
 from i18n import t
+from ui_strings import SCALE_DISPLAY
 
 i18n.init()
 i18n.render_controls()
@@ -682,6 +683,9 @@ with left:
                 "Scale",
                 options=scales,
                 index=scales.index("minor_pentatonic") if "minor_pentatonic" in scales else 0,
+                # Pretty display only — the returned value stays the raw token
+                # (filename tags and SCALES lookups depend on it).
+                format_func=lambda s: t(SCALE_DISPLAY.get(s, s)),
                 help="Choose from major/modes, pentatonics, blues, etc.",
             )
 
