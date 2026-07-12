@@ -62,7 +62,7 @@ Both are optional. With neither set, the app runs fully unrestricted and collect
 - **BPM:** tempo for randomized note durations. If you uploaded drum MIDI, match this to the drum track.
 - **Melody character:** harmonic color preset — neutral, warm, voice, reed, bell, pluck, bright, or wide (7-cent detune spread).
 - **Note shape / Note decay:** envelope feel for imprinted notes; lower decay = staccato.
-- **Advanced:** MIDI range (low/high), step bias vs. leaps, rest probability, glides, vibrato, root drone level, imprint gain, harmonics, **BW frac** (the primary texture control — narrow = tight pitch instruction, wide = diffuse), and **noise floor (dB)** to attenuate non-harmonic static.
+- **Advanced:** MIDI range (low/high), step bias vs. leaps, rest probability, glides, vibrato, root drone level, imprint gain, harmonics, **Harmonic bandwidth** (the main textural control — the width of each harmonic peak as a fraction of its frequency, so 0.01 keeps energy within ±1% of each harmonic; narrow = tight pitch instruction, wide = diffuse), and **noise floor (dB)** to attenuate non-harmonic static.
 - **Vowel character (expander):** off by default (vowel-neutral buzz gives the AI freedom). On = biases the output toward voice-like vowel color in a chosen language — English, Japanese, or Spanish. See [Vowel imprint & languages](#vowel-imprint--languages) for what this does and doesn't do.
 
 **Drum MIDI Imprint** (when enabled)
@@ -72,7 +72,7 @@ Both are optional. With neither set, the app runs fully unrestricted and collect
 - **Drum character / Snare tune / Drum decay:** compact tone, tuning, and envelope-length controls.
 - **Match melody BPM / Independent drum BPM / Use detected BPM:** tempo targeting. New uploads start at their detected MIDI BPM.
 - **Loop drums to prompt length:** repeats the MIDI when the prompt is longer than the region.
-- **Trim silence before first note:** removes the empty bars that appear when the exported region didn't start at bar 1 of the project; silence you wrote into the region (e.g. drums resting for the first bars of a loop) is preserved. See [Leading silence in MIDI exports](#leading-silence-in-midi-exports).
+- **Trim DAW export padding:** removes the empty bars that appear when the exported region didn't start at bar 1 of the project; silence you wrote into the region (e.g. drums resting for the first bars of a loop) is preserved. See [Leading silence in MIDI exports](#leading-silence-in-midi-exports).
 
 **Bass MIDI Imprint** (when enabled)
 
@@ -81,7 +81,7 @@ Both are optional. With neither set, the app runs fully unrestricted and collect
 - **Note shape base / Decay offset:** envelope controls before velocity is applied.
 - **Pitch bend range:** must match the pitch-wheel range of the instrument that generated the MIDI. When the file declares its range (an RPN "pitch bend sensitivity" message — Logic's Bass Player exports include one), the slider defaults to the detected value and a caption confirms it; otherwise set it by hand (12, 24, and 48 semitones are common for slide-capable bass patches). If slides come out too shallow or too extreme, this number is wrong.
 - **Tempo, looping, and trim-silence controls:** same pattern as the drum layer; the bass trim additionally preserves a pickup written on the first note. See [Leading silence in MIDI exports](#leading-silence-in-midi-exports).
-- **Advanced:** bass imprint gain, BW frac, and noise floor (dB).
+- **Advanced:** bass imprint gain, harmonic bandwidth, and noise floor (dB).
 
 **Focus** (when enabled)
 
@@ -105,7 +105,7 @@ Output names encode the key generation settings:
 - Prompt only: `ap_prompt_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav`
 - Combined: `my-song-take-1_combined_r-e_s-minpent_mb-96_ms-1234_db-172_ds-1235.wav`
 
-Tags: `r` = root, `s` = scale, `mb` = melody BPM, `ms` = melody/noise seed, `db` = drum BPM, `ds` = drum seed, `len` = length. Focus appears only when enabled (`f-voc`, `f-b120-3200`); character only when non-neutral (`ch-voice`); vowel imprint when enabled (`vow-EN-s60-a2` = English, strength 60%, accent period 2; `vow-JA-s60` / `vow-ES-s60` for Japanese/Spanish, which have no accent period); `bw-N` when BW frac differs from the 0.01 default.
+Tags: `r` = root, `s` = scale, `mb` = melody BPM, `ms` = melody/noise seed, `db` = drum BPM, `ds` = drum seed, `len` = length. Focus appears only when enabled (`f-voc`, `f-b120-3200`); character only when non-neutral (`ch-voice`); vowel imprint when enabled (`vow-EN-s60-a2` = English, strength 60%, accent period 2; `vow-JA-s60` / `vow-ES-s60` for Japanese/Spanish, which have no accent period); `bw-N` when Harmonic bandwidth differs from the 0.01 default.
 
 ## MIDI drum map (General MIDI → lanes)
 
@@ -128,7 +128,7 @@ Notes:
 
 ## Leading silence in MIDI exports
 
-Both MIDI layers have a **Trim silence before first note** switch (on by default). The problem it solves: DAWs export MIDI with **tick 0 at bar 1 of the project**, not at the start of the exported region. If your region sat at bar 2 of the arrangement, the file arrives with a bar of silence that was never part of the music — and in a 3–6 s prompt, one bar of dead air is a third or more of the steer.
+Both MIDI layers have a **Trim DAW export padding** switch (on by default). The problem it solves: DAWs export MIDI with **tick 0 at bar 1 of the project**, not at the start of the exported region. If your region sat at bar 2 of the arrangement, the file arrives with a bar of silence that was never part of the music — and in a 3–6 s prompt, one bar of dead air is a third or more of the steer.
 
 The rule trim follows:
 
@@ -182,7 +182,7 @@ Other languages: syllable- and mora-timed languages without vowel reduction (Kor
 - **"Failed to read input audio":** convert to WAV/FLAC/OGG; ensure the app has file read permission.
 - **macOS privacy:** if reading from protected folders (e.g. Documents), grant Full Disk Access to your terminal/IDE.
 - **Clipping:** reduce Prompt gain (dB) or increase fade-in/out.
-- **Weak steer:** increase Imprint gain and/or Harmonics; narrow BW frac; extend the prompt length.
+- **Weak steer:** increase Imprint gain and/or Harmonics; narrow the Harmonic bandwidth; extend the prompt length.
 - **MIDI upload fails:** try click-to-browse instead of drag-and-drop; ensure a valid `.mid`/`.midi` file.
 - **Drums too quiet in the mix:** raise the Drum level blend slider, or lower Melody level.
 

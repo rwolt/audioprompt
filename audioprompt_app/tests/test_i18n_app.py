@@ -61,7 +61,7 @@ def test_both_midi_sections_in_help_text_mode():
     cbs["Enable bass MIDI imprint"].check()
     at.run()
     assert not at.exception, f"duplicate-ID regression: {at.exception}"
-    trims = [c for c in at.checkbox if c.label == "Trim silence before first note"]
+    trims = [c for c in at.checkbox if c.label == "Trim DAW export padding"]
     assert len(trims) == 2, "expected both trim checkboxes rendered"
     print("  both MIDI sections + a11y: no widget ID collision")
 

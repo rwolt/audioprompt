@@ -94,9 +94,9 @@ JA: dict[str, str] = {
     "Strength of harmonic emphasis on the pink noise.": "ピンクノイズへの倍音強調の強さ。",
     "Harmonics": "倍音数",
     "Number of harmonic peaks in the pitch mask.": "ピッチマスク内の倍音ピーク数。",
-    "BW frac": "帯域幅比 (BW frac)",
-    "Primary texture control. Narrow (0.005–0.01): tight pitch instruction, can sound synthetic. Widen (0.02–0.05) to make the melody feel less robotic without losing the harmonic steer. Go higher (0.05–0.1) for a very diffuse, atmospheric texture.":
-        "主要なテクスチャ調整。狭い (0.005〜0.01): タイトなピッチ指示だがやや人工的。広め (0.02〜0.05): 倍音の誘導を保ちつつロボット感を軽減。さらに広く (0.05〜0.1): 非常に拡散したアンビエントな質感に。",
+    "Harmonic bandwidth": "倍音帯域幅",
+    "The main textural control: the width of each harmonic peak, as a fraction of its frequency (0.01 = ±1%, about a sixth of a semitone). Narrow (0.005–0.01): tight, precise pitch instruction, can sound synthetic. Wider (0.02–0.05): looser and more natural without losing the harmonic steer. Very wide (0.05–0.1): diffuse, atmospheric texture.":
+        "主要なテクスチャ調整: 各倍音ピークの幅を、その周波数に対する比率で指定します（0.01 = 約±1%、半音の約6分の1）。狭い (0.005〜0.01): タイトで正確なピッチ指示だがやや人工的。広め (0.02〜0.05): 倍音の誘導を保ちつつ自然な質感に。さらに広く (0.05〜0.1): 拡散したアンビエントな質感。",
     "Noise floor (dB)": "ノイズフロア (dB)",
     "Attenuation of non-harmonic pink noise. 0 dB = full noise floor (current behavior). Lower values reduce broadband static while keeping harmonic emphasis. Try –18 to –30 dB if the prompt is introducing extra noise into your AI music output.":
         "非倍音成分のピンクノイズの減衰量。0 dB = ノイズフロアそのまま（従来動作）。下げるほど倍音強調を保ったまま広帯域ノイズを削減。AI出力にノイズが乗る場合は −18〜−30 dB を試してください。",
@@ -158,7 +158,7 @@ JA: dict[str, str] = {
     "Loop drums to prompt length": "プロンプト長までドラムをループ",
     "Repeats the drum MIDI when the prompt is longer than the MIDI region. Turn off to let the drums stop after the uploaded MIDI ends.":
         "プロンプトがMIDIリージョンより長い場合にドラムMIDIを繰り返します。オフにするとMIDI終了後にドラムが止まります。",
-    "Trim silence before first note": "最初のノート前の無音をカット",
+    "Trim DAW export padding": "DAW書き出しの余白をカット",
     "Removes the empty bars a DAW adds when the exported region didn't start at bar 1 of the project — the export timeline starts at project bar 1, so region position becomes leading silence in the file. Silence inside the region, like drums resting for the first bars of a loop, is preserved. Turn off to keep the file's raw timing.":
         "書き出したリージョンがプロジェクトの1小節目から始まっていない場合にDAWが付加する先頭の空白小節を取り除きます — 書き出しのタイムラインはプロジェクトの1小節目から始まるため、リージョンの位置がそのままファイル先頭の無音になります。ループの最初の数小節を休むなど、リージョン内の無音は保持されます。オフにするとファイルの元のタイミングをそのまま使います。",
 
@@ -197,9 +197,9 @@ JA: dict[str, str] = {
     "Bass imprint gain": "ベースインプリントゲイン",
     "Strength of harmonic emphasis on the bass pitch mask.":
         "ベースピッチマスクへの倍音強調の強さ。",
-    "Bass BW frac": "ベース帯域幅比 (BW frac)",
-    "Relative bandwidth around each harmonic. Wider = looser, less synthetic-sounding pitch lock.":
-        "各倍音まわりの相対帯域幅。広いほど緩く、人工的でないピッチロックになります。",
+    "Bass harmonic bandwidth": "ベース倍音帯域幅",
+    "Width of each harmonic peak, as a fraction of its frequency (0.01 = ±1%). Wider = looser, less synthetic-sounding pitch lock.":
+        "各倍音ピークの幅を、その周波数に対する比率で指定します（0.01 = 約±1%）。広いほど緩く、人工的でないピッチロックになります。",
     "Bass noise floor (dB)": "ベースノイズフロア (dB)",
     "Attenuation of non-harmonic noise within the bass focus band. 0 dB = no attenuation (current behavior). Lower values reduce residual static inside the bass frequency window. Less impactful than melody noise floor since the bass focus band is already narrow.":
         "ベースフォーカス帯域内の非倍音ノイズの減衰量。0 dB = 減衰なし（従来動作）。下げるほど帯域内の残留ノイズを削減。帯域が狭いため、メロディのノイズフロアほどの効果はありません。",

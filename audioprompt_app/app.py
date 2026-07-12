@@ -754,12 +754,13 @@ with left:
             with icol2:
                 harmonics = st.slider("Harmonics", 0, 16, 10, 1,
                     help="Number of harmonic peaks in the pitch mask.")
-            bw_frac = st.slider("BW frac", 0.002, 0.1, 0.01, 0.001,
+            bw_frac = st.slider("Harmonic bandwidth", 0.002, 0.1, 0.01, 0.001,
                 format="%.3f",
-                help="Primary texture control. Narrow (0.005–0.01): tight pitch instruction, "
-                     "can sound synthetic. Widen (0.02–0.05) to make the melody feel less "
-                     "robotic without losing the harmonic steer. Go higher (0.05–0.1) for a "
-                     "very diffuse, atmospheric texture.")
+                help="The main textural control: the width of each harmonic peak, as a "
+                     "fraction of its frequency (0.01 = ±1%, about a sixth of a semitone). "
+                     "Narrow (0.005–0.01): tight, precise pitch instruction, can sound "
+                     "synthetic. Wider (0.02–0.05): looser and more natural without losing "
+                     "the harmonic steer. Very wide (0.05–0.1): diffuse, atmospheric texture.")
             melody_noise_floor_db = st.slider("Noise floor (dB)", -60.0, 0.0, 0.0, 1.0,
                 help="Attenuation of non-harmonic pink noise. 0 dB = full noise floor (current "
                      "behavior). Lower values reduce broadband static while keeping harmonic "
@@ -1015,7 +1016,7 @@ with left:
             ),
         )
         drum_trim_silence = st.checkbox(
-            "Trim silence before first note",
+            "Trim DAW export padding",
             value=True,
             # Explicit key: the bass section has an identically labeled
             # checkbox, and in help-as-text mode (help stripped from the
@@ -1162,7 +1163,7 @@ with left:
             help="Repeats the bass MIDI when the prompt is longer than the MIDI region.",
         )
         bass_trim_silence = st.checkbox(
-            "Trim silence before first note",
+            "Trim DAW export padding",
             value=True,
             key="bass_trim_silence_cb",  # see drum twin: avoids duplicate auto-ID
             help=(
@@ -1180,10 +1181,10 @@ with left:
                 bass_imprint_gain = st.slider("Bass imprint gain", 0.0, 16.0, 8.0, 0.5,
                     help="Strength of harmonic emphasis on the bass pitch mask.")
             with bacol2:
-                bass_bw_frac = st.slider("Bass BW frac", 0.002, 0.05, 0.01, 0.001,
+                bass_bw_frac = st.slider("Bass harmonic bandwidth", 0.002, 0.05, 0.01, 0.001,
                     format="%.3f",
-                    help="Relative bandwidth around each harmonic. Wider = looser, "
-                         "less synthetic-sounding pitch lock.")
+                    help="Width of each harmonic peak, as a fraction of its frequency "
+                         "(0.01 = ±1%). Wider = looser, less synthetic-sounding pitch lock.")
             bass_noise_floor_db = st.slider("Bass noise floor (dB)", -60.0, 0.0, 0.0, 1.0,
                 help="Attenuation of non-harmonic noise within the bass focus band. "
                      "0 dB = no attenuation (current behavior). Lower values reduce "
